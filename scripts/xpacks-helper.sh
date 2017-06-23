@@ -6,8 +6,8 @@
 # Bash helper script used in project generate.sh scripts.
 # -----------------------------------------------------------------------------
 
-do_add_stm32f7_usart_xpack() {
-  local pack_name='stm32f7-usart'
+do_add_stm32f7_uart_xpack() {
+  local pack_name='stm32f7-uart'
   do_tell_xpack "${pack_name}-xpack"
 
   do_select_pack_folder "lix/${pack_name}.git"
