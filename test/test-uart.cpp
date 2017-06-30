@@ -54,8 +54,14 @@ os::posix::file_descriptors_manager descriptors_manager
 #define TX_BUFFER_SIZE 200
 #define RX_BUFFER_SIZE 200
 
+#define TEST_ROUNDS 10
+#define WRITE_READ_ROUNDS 10
+
 uint8_t tx_buffer[TX_BUFFER_SIZE];
 uint8_t rx_buffer[RX_BUFFER_SIZE];
+
+static ssize_t
+targeted_read (int filedes, char *buffer, size_t size);
 
 driver::uart uart6
   { "uart6", &huart6, tx_buffer, rx_buffer, sizeof(tx_buffer), sizeof(rx_buffer) };
@@ -65,7 +71,16 @@ HAL_UART_TxCpltCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == huart6.Instance)
     {
-      uart6.cb_tx_event (huart);
+      uart6.cb_tx_event ();
+    }
+}
+
+void
+HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
+{
+  if (huart->Instance == huart6.Instance)
+    {
+      uart6.cb_rx_event (false);
     }
 }
 
@@ -74,7 +89,7 @@ HAL_UART_RxHalfCpltCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == huart6.Instance)
     {
-      uart6.cb_rx_event (huart);
+      uart6.cb_rx_event (true);
     }
 }
 
@@ -83,7 +98,7 @@ HAL_UART_ErrorCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == huart6.Instance)
     {
-      uart6.cb_rx_event (huart);
+      uart6.cb_rx_event (false);
     }
 }
 
@@ -96,29 +111,103 @@ test_uart (void)
   int fd, count;
   char text[] =
     { "The quick brown fox jumps over the lazy dog 1234567890\r\n" };
+  char text_end[] =
+    { "---------\r\n" };
+  char buffer[100];
 
+#ifdef M717
   // configure the MPI interface
   mpi_ctrl mpi
-    { };
+    {};
 
+  /* set to RS232 */
   mpi.init_pins ();
   mpi.rs485 (false);
   mpi.shutdown (false);
   mpi.half_duplex (false);
+#endif
 
-  // open the serial device
-  if ((fd = open ("/dev/uart6", 0)) < 0)
+  for (int i = 0; i < TEST_ROUNDS; i++)
     {
-      trace::printf ("Error at open\n");
-    }
-
-  // send text
-  for (int i = 0; i < 1000; i++)
-    {
-      if ((count = write (fd, text, strlen (text))) < 0)
+      // open the serial device
+      if ((fd = open ("/dev/uart6", 0)) < 0)
         {
-          trace::printf ("Error at write (%d)\n", i);
+          trace::printf ("Error at open\n");
+        }
+      else
+        {
+          for (int j = 0; j < WRITE_READ_ROUNDS; j++)
+            {
+              // send text
+              if ((count = write (fd, text, strlen (text))) < 0)
+                {
+                  trace::printf ("Error at write (%d)\n", j);
+                  break;
+                }
+
+              // read text
+              count = targeted_read (fd, buffer, strlen (text));
+              if (count > 0)
+                {
+                  buffer[count] = '\0';
+                  trace::printf ("%s", buffer);
+                }
+              else
+                {
+                  trace::printf ("Error reading data\n");
+                }
+            }
+
+          // send separating dashes
+          if ((count = write (fd, text_end, strlen (text_end))) < 0)
+            {
+              trace::printf ("Error at write end text\n");
+              break;
+            }
+
+          // read separating dashes
+          count = targeted_read (fd, buffer, strlen (text_end));
+          if (count > 0)
+            {
+              buffer[count] = '\0';
+              trace::printf ("%s", buffer);
+            }
+          else
+            {
+              trace::printf ("Error reading separator\n");
+            }
+
+          // close the serial device
+          if ((close (fd)) < 0)
+            {
+              trace::printf ("Error at close\n");
+              break;
+            }
         }
     }
+}
 
+/**
+ * @brief This function waits to read a known amount of bytes before returning
+ * @param fd: file descriptor
+ * @param buffer: buffer to return data into.
+ * @param size: the targeted amount of characters to wait for
+ * @return The number of characters read or an error if negative.
+ */
+static ssize_t
+targeted_read (int fd, char *buffer, size_t size)
+{
+  int count, total = 0;
+
+  do
+    {
+      if ((count = read (fd, buffer + total, size - total)) < 0)
+        {
+          break;
+        }
+      total += count;
+    }
+  while (total < (int) size);
+
+  return total;
 }
