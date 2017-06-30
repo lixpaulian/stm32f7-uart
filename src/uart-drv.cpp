@@ -39,8 +39,8 @@ namespace os
   namespace driver
   {
 
-    uart::uart (const char* name, UART_HandleTypeDef* huart, void* tx_buff,
-                void* rx_buff, size_t tx_buff_size, size_t rx_buff_size) : //
+    uart::uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
+                uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size) : //
         device_char
           { name }, //
         huart_
@@ -56,15 +56,26 @@ namespace os
     {
       trace::printf ("%s() %p\n", __func__, this);
 
+      // de-initialize the UART, as we assume this was automatically done by
+      // the CubeMX generated code.
+      if (huart->Instance != nullptr)
+        {
+          HAL_UART_DeInit (huart);
+        }
+
+      // if not using DMA, the rx_buff_size must be even
+      rx_buff_size_ % 2 ? rx_buff_size_-- : rx_buff_size_;
+
+      // if no rx/tx buffers supplied, create them dynamically
       if (tx_buff == nullptr)
         {
-          tx_buff = malloc (tx_buff_size);
+          tx_buff = (uint8_t *) malloc (tx_buff_size_);
           assert(tx_buff != nullptr);
         }
 
       if (rx_buff == nullptr)
         {
-          rx_buff = malloc (rx_buff_size_);
+          rx_buff = (uint8_t *) malloc (rx_buff_size_);
           assert(rx_buff != nullptr);
         }
     }
@@ -78,13 +89,21 @@ namespace os
     int
     uart::do_vopen (const char* path, int oflag, std::va_list args)
     {
+      HAL_StatusTypeDef result;
+
       if (is_opened_)
         {
           errno = EEXIST; // Already opened
           return -1;
         }
 
-      // initialize fifos and semaphores
+      // initialize the UART
+      HAL_UART_Init (huart_);
+
+      // set initial timeout to infinitum (blocking)
+      rx_timeout_ = 0xFFFFFFFF;
+
+      // initialize FIFOs and semaphores
       tx_in_ = tx_out_ = 0;
       rx_in_ = rx_out_ = 0;
 
@@ -92,24 +111,105 @@ namespace os
       tx_sem_.reset ();
       rx_sem_.reset ();
 
-      is_opened_ = true;
+      // clear receiver idle flag, then enable interrupt on receiver idle
+      __HAL_UART_CLEAR_IDLEFLAG(huart_);
+      __HAL_UART_ENABLE_IT(huart_, UART_IT_IDLE);
 
-      return 0;
+      // start receiving, basically wait for input characters
+      // check if we have DMA enabled for receive
+      if (huart_->hdmarx == nullptr)
+        {
+          // this is receive via the non-DMA variant
+          result = HAL_UART_Receive_IT (huart_, rx_buff_, rx_buff_size_ / 2);
+        }
+      else
+        {
+          // this is receive via the DMA variant
+          result = HAL_UART_Receive_DMA (huart_, rx_buff_, rx_buff_size_);
+        }
+
+      if (result != HAL_OK)
+        {
+          switch (result)
+            {
+            case HAL_BUSY:
+              errno = EBUSY;
+              break;
+
+            default:
+              errno = EIO;
+              break;
+            }
+          return -1;
+        }
+      else
+        {
+          is_opened_ = true;
+          return 0;
+        }
     }
 
     int
     uart::do_close (void)
     {
+      // wait for possible ongoing write operation to finish
+      while (huart_->gState == HAL_UART_STATE_BUSY_TX)
+        {
+          tx_sem_.wait ();
+        }
+
+      if (huart_->hdmarx != nullptr || huart_->hdmatx != nullptr)
+        {
+          // stop and disable the DMA
+          HAL_UART_DMAStop (huart_);
+        }
+
+      // disable interrupt on receive idle and switch off the UART
+      __HAL_UART_DISABLE_IT(huart_, UART_IT_IDLE);
+      HAL_UART_DeInit (huart_);
+
       is_opened_ = false;
+
       return 0;
     }
 
     ssize_t
     uart::do_read (void* buf, std::size_t nbyte)
     {
-      HAL_StatusTypeDef result;
+      uint8_t* lbuf = (uint8_t *) buf;
+      ssize_t count = 0;
+      int c;
 
-      return 0;
+      while (rx_out_ == rx_in_)
+        {
+          if (rx_sem_.timed_wait (rx_timeout_) != os::rtos::result::ok)
+            {
+              return count;     // timeout, return 0 chars
+            }
+        }
+
+      while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
+        {
+          c = rx_buff_[rx_out_++];
+
+          // TODO: handle UART errors here (PE, FE, etc.)
+          if (c >= 0)
+            {
+              *lbuf++ = c;
+              count++;
+              if (rx_out_ >= rx_buff_size_)
+                {
+                  rx_out_ = 0;
+                }
+            }
+          else
+            {
+              count = c;
+              break;
+            }
+        }
+
+      return count;
     }
 
     ssize_t
@@ -118,16 +218,26 @@ namespace os
       HAL_StatusTypeDef result;
       ssize_t count = 0;
 
-      tx_sem_.wait();
-      memcpy(tx_buff_, buf, count = std::min (tx_buff_size_, nbyte));
+      tx_sem_.wait ();
+      memcpy (tx_buff_, buf, count = std::min (tx_buff_size_, nbyte));
 
-      // try to send the buffer
-      result = HAL_UART_Transmit_DMA (huart_, (uint8_t *) tx_buff_, count);
+      // send the buffer, as much as it can
+      if (huart_->hdmatx == nullptr)
+        {
+          // the non-DMA variant
+          result = HAL_UART_Transmit_IT (huart_, tx_buff_, count);
+        }
+      else
+        {
+          // the DMA variant
+          result = HAL_UART_Transmit_DMA (huart_, tx_buff_, count);
+        }
+
       if (result != HAL_OK)
         {
           count = 0;
           switch (result)
-          {
+            {
             case HAL_BUSY:
               errno = EBUSY;
               break;
@@ -135,7 +245,7 @@ namespace os
             default:
               errno = EIO;
               break;
-          }
+            }
         }
       return count;
     }
@@ -143,20 +253,20 @@ namespace os
     bool
     uart::do_is_opened (void)
     {
-      return true;
+      return is_opened_;
     }
 
     bool
     uart::do_is_connected (void)
     {
-      return true;
+      return true;      // TODO: check DCD, but where's the DCD line?
     }
 
     /**
      * @brief  Transmit event call-back.
      */
     void
-    uart::cb_tx_event (UART_HandleTypeDef* huart)
+    uart::cb_tx_event (void)
     {
       tx_sem_.post ();
     }
@@ -165,9 +275,51 @@ namespace os
      * @brief  Receive event call-back. Here are reported receive errors too.
      */
     void
-    uart::cb_rx_event (UART_HandleTypeDef* huart)
+    uart::cb_rx_event (bool half)
     {
-      error_code_ = huart->ErrorCode;
+      size_t xfered;
+      size_t half_buffer_size = rx_buff_size_ / 2;
+
+      // TODO: handle errors (PE, FE, etc.) returned in huart->ErrorCode
+
+      // compute the number of chars received during the last transfer
+      if (huart_->hdmarx == nullptr)
+        {
+          // non DMA xfer
+          xfered = rx_in_ - (rx_in_ >= half_buffer_size ? half_buffer_size : 0);
+          xfered = half_buffer_size - xfered - huart_->RxXferCount;
+        }
+      else
+        {
+          // DMA xfer
+          xfered = rx_buff_size_ - rx_in_ - huart_->hdmarx->Instance->NDTR;
+        }
+
+      // update the "in" pointer on buffer
+      if ((rx_in_ += xfered) >= rx_buff_size_)
+        {
+          // if overflow, reset the "in" pointer, i.e. transfer was complete
+          rx_in_ = 0;
+        }
+
+      // re-initialize system for receiving
+      if (huart_->hdmarx == nullptr)
+        {
+          if (huart_->RxXferCount == 0)
+            {
+              HAL_UART_Receive_IT (
+                  huart_, rx_in_ == 0 ? rx_buff_ : rx_buff_ + half_buffer_size,
+                  half_buffer_size);
+            }
+        }
+      else
+        {
+          if (half == false && rx_in_ == 0)
+            {
+              HAL_UART_Receive_DMA (huart_, rx_buff_, rx_buff_size_);
+            }
+        }
+
       rx_sem_.post ();
     }
 

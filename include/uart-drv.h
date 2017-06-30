@@ -49,8 +49,8 @@ namespace os
 
       // --------------------------------------------------------------------
 
-      uart (const char* name, UART_HandleTypeDef* huart, void* tx_buff,
-            void* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
+      uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
+            uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
 
       uart (const uart&) = delete;
 
@@ -67,10 +67,10 @@ namespace os
 
       // specific, not inherited functions
       void
-      cb_tx_event (UART_HandleTypeDef* huart);
+      cb_tx_event (void);
 
       void
-      cb_rx_event (UART_HandleTypeDef* huart);
+      cb_rx_event (bool half);
 
       // --------------------------------------------------------------------
 
@@ -99,8 +99,8 @@ namespace os
     private:
 
       UART_HandleTypeDef* huart_;
-      void* tx_buff_;
-      void* rx_buff_;
+      uint8_t* tx_buff_;
+      uint8_t* rx_buff_;
       size_t tx_buff_size_;
       size_t rx_buff_size_;
 
@@ -109,9 +109,10 @@ namespace os
       size_t rx_in_;
       size_t rx_out_;
 
+      rtos::clock_systick::duration_t rx_timeout_;
+
       bool volatile is_connected_ = false;
       bool volatile is_opened_ = false;
-      uint32_t error_code_ = HAL_UART_ERROR_NONE;
 
       os::rtos::semaphore_binary tx_sem_
         { "tx", 1 };
