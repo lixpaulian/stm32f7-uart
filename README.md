@@ -72,13 +72,13 @@ void USART6_IRQHandler(void)
 ### Buffers selection
 Both receive and transmit sections need decent buffers to properly operate. The buffer's size depends on your application. You can either provide two static buffers, or null pointers and in this case the driver will dynamically allocate the buffers.
 
-In general, for slow typed input and output, buffers of several tens of bytes are sufficient; it is important to test the result of the read() and write() functions to be sure all bytes have been sent, or if you received the expecte frame in its entirety.
+In general, for slow typed input and output, buffers of several tens of bytes are sufficient; it is important to test the result of the `read()` and `write()` functions to be sure all characters have been sent, or if you received the expected frame in its entirety.
 
-However, if you implement a serial protocol, then the buffers should be selected according to the typical frame length of the protocol. Small buffers will still do, but the efficiency will decrease and at high speeds the driver might even lose characters.
+However, if you implement a serial protocol, then the buffers should be sized according to the typical frame length of the protocol. Small buffers will still do, but the efficiency will decrease and at high speeds the driver might even lose characters.
 
 ## Tests
 A separate directory `test` is included that opens a serial port, reads some serial parameters, writes a string and receives it 10 times in a loop, then closes the port. The open/write/read/close cycle is repeated 10 times before the program exits.
 
-Obviously, in order to function, you must short the RxD and TxD of your UART.
+Obviously, in order to function, you must short the RxD and TxD signals of your UART.
 
 
