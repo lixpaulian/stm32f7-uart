@@ -35,6 +35,7 @@
 
 #include <cmsis-plus/rtos/os.h>
 #include <cmsis-plus/posix-io/device-char.h>
+#include <termios.h>
 
 #if defined (__cplusplus)
 
@@ -65,12 +66,21 @@ namespace os
       virtual
       ~uart () noexcept;
 
-      // specific, not inherited functions
+      // driver specific, not inherited functions
       void
       cb_tx_event (void);
 
       void
       cb_rx_event (bool half);
+
+      void
+      get_version (uint8_t& version_major, uint8_t& version_minor);
+
+      int
+      do_tcgetattr (struct termios *ptio);
+
+      int
+      do_tcsetattr (int options, const struct termios *ptio);
 
       // --------------------------------------------------------------------
 
@@ -98,16 +108,20 @@ namespace os
 
     private:
 
+      static constexpr uint8_t UART_DRV_VERSION_MAJOR = 0;
+      static constexpr uint8_t UART_DRV_VERSION_MINOR = 3;
+
       UART_HandleTypeDef* huart_;
       uint8_t* tx_buff_;
       uint8_t* rx_buff_;
       size_t tx_buff_size_;
       size_t rx_buff_size_;
-
-      size_t tx_in_;
-      size_t tx_out_;
-      size_t rx_in_;
-      size_t rx_out_;
+      size_t volatile tx_in_;
+      size_t volatile tx_out_;
+      size_t volatile rx_in_;
+      size_t volatile rx_out_;
+      bool tx_buff_dyn_;
+      bool rx_buff_dyn_;
 
       rtos::clock_systick::duration_t rx_timeout_;
 
@@ -118,8 +132,19 @@ namespace os
         { "tx", 1 };
       os::rtos::semaphore_binary rx_sem_
         { "rx", 0 };
-
     };
+
+    /**
+     * @brief  Return the version of the driver.
+     * @param  version_major: major version.
+     * @param  version_minor: minor version.
+     */
+    inline void
+    uart::get_version (uint8_t& version_major, uint8_t& version_minor)
+    {
+      version_major = UART_DRV_VERSION_MAJOR;
+      version_minor = UART_DRV_VERSION_MINOR;
+    }
 
   } /* namespace driver */
 } /* namespace os */
