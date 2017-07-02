@@ -409,9 +409,18 @@ namespace os
       // its availability is conditional in the header file currently used;
       // hopefully this issue will be clarified in a future version of µOS++.
 
-      if ((result = UART_SetConfig (huart_)) != HAL_OK)
+      // TODO: handle options
+
+      // before sending the new configuration, stop UART
+      __HAL_UART_DISABLE(huart_);
+
+      // send config and restart UART
+      result = UART_SetConfig (huart_);
+      __HAL_UART_ENABLE(huart_);
+
+      if (result != HAL_OK)
         {
-           switch (result)
+          switch (result)
             {
             case HAL_BUSY:
               errno = EBUSY;
@@ -421,7 +430,7 @@ namespace os
               errno = EIO;
               break;
             }
-           return -1;
+          return -1;
         }
 
       return 0;
@@ -445,7 +454,9 @@ namespace os
       size_t xfered;
       size_t half_buffer_size = rx_buff_size_ / 2;
 
-      // TODO: handle errors (PE, FE, etc.) returned in huart->ErrorCode
+      // TODO: handle errors (PE, FE, etc.) Caution: the errors should be
+      // read directly from the UART instance, as the interrupt on idle
+      // does not pass through the HAL interrupt handler!
 
       // compute the number of chars received during the last transfer
       if (huart_->hdmarx == nullptr)
@@ -470,7 +481,7 @@ namespace os
       // re-initialize system for receiving
       if (huart_->hdmarx == nullptr)
         {
-          // non-DMA transfer
+          // for non-DMA transfer
           if (huart_->RxXferCount == 0)
             {
               HAL_UART_Receive_IT (
@@ -480,7 +491,7 @@ namespace os
         }
       else
         {
-          // DMA transfer
+          // for DMA transfer
           // flush and clean the data cache to mitigate incoherence after
           // DMA transfers (all but the DTCM RAM is cached)
           if ((rx_buff_ + rx_buff_size_) >= (uint8_t *) SRAM1_BASE)
