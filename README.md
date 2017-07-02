@@ -67,6 +67,7 @@ void USART6_IRQHandler(void)
     }
   /* USER CODE END USART6_IRQn 1 */
 }
+```
 
 ### Buffers selection
 Both receive and transmit sections need decent buffers to properly operate. The buffer's size depends on your application. You can either provide two static buffers, or null pointers and in this case the driver will dynamically allocate the buffers.
