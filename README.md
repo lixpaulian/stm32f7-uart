@@ -1,5 +1,5 @@
 # stm32f7-uart
-This is a USART driver for the STM32F7xx family of controllers.
+This is a µOS++ UART driver for the STM32F7xx family of controllers.
 
 The driver is functional, but there is still much work to do. What is still missing (and the list is probably incomplete):
 * Error handling (parity, framing, etc.)
