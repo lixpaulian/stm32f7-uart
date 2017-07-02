@@ -77,8 +77,6 @@ In general, for slow typed input and output, buffers of several tens of bytes ar
 However, if you implement a serial protocol, then the buffers should be sized according to the typical frame length of the protocol. Small buffers will still do, but the efficiency will decrease and at high speeds the driver might even lose characters.
 
 ## Tests
-A separate directory `test` is included that opens a serial port, reads some serial parameters, writes a string and receives it 10 times in a loop, then closes the port. The open/write/read/close cycle is repeated 10 times before the program exits.
+A separate directory `test` is included that contains a short test program: it opens a serial port, writes a string and receives it 10 times in a loop, then closes the port. The open/write/read/close cycle is repeated 10 times before the program exits.
 
 Obviously, in order to function, you must short the RxD and TxD signals of your UART.
-
-
