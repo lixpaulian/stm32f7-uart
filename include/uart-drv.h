@@ -109,7 +109,7 @@ namespace os
     private:
 
       static constexpr uint8_t UART_DRV_VERSION_MAJOR = 0;
-      static constexpr uint8_t UART_DRV_VERSION_MINOR = 3;
+      static constexpr uint8_t UART_DRV_VERSION_MINOR = 4;
 
       UART_HandleTypeDef* huart_;
       uint8_t* tx_buff_;
