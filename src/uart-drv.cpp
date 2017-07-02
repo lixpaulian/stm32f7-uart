@@ -29,7 +29,12 @@
 
 #include <cmsis-plus/rtos/os.h>
 #include <cmsis-plus/diag/trace.h>
+
 #include "uart-drv.h"
+
+static const speed_t br_tab[] =
+  { 0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600,
+      19200, 38400, 57600, 115200, 230400, 460800, 500000, 576000, 921600 };
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -56,8 +61,8 @@ namespace os
     {
       trace::printf ("%s() %p\n", __func__, this);
 
-      // de-initialize the UART, as we assume this was automatically done by
-      // the CubeMX generated code.
+      // de-initialize the UART, as we assume it was automatically initialized
+      // by the CubeMX generated code in the CubeMX's main () function.
       if (huart->Instance != nullptr)
         {
           HAL_UART_DeInit (huart);
@@ -65,72 +70,106 @@ namespace os
 
       // if not using DMA, the rx_buff_size must be even
       rx_buff_size_ % 2 ? rx_buff_size_-- : rx_buff_size_;
-
-      // if no rx/tx buffers supplied, create them dynamically
-      if (tx_buff == nullptr)
-        {
-          tx_buff = (uint8_t *) malloc (tx_buff_size_);
-          assert(tx_buff != nullptr);
-        }
-
-      if (rx_buff == nullptr)
-        {
-          rx_buff = (uint8_t *) malloc (rx_buff_size_);
-          assert(rx_buff != nullptr);
-        }
     }
 
     uart::~uart ()
     {
-      huart_ = nullptr;
       trace::printf ("%s() %p\n", __func__, this);
+
+      huart_ = nullptr;
+      is_opened_ = false;
     }
 
     int
     uart::do_vopen (const char* path, int oflag, std::va_list args)
     {
-      HAL_StatusTypeDef result;
+      HAL_StatusTypeDef hal_result = HAL_OK;
+      int result = -1;
 
-      if (is_opened_)
+      do
         {
-          errno = EEXIST; // Already opened
-          return -1;
+          if (is_opened_)
+            {
+              errno = EEXIST; // already opened
+              break;
+            }
+
+          // initialize the UART
+          if ((hal_result = HAL_UART_Init (huart_)) != HAL_OK)
+            {
+              break;
+            }
+
+          // clear receiver idle flag, then enable interrupt on receiver idle
+          __HAL_UART_CLEAR_IDLEFLAG(huart_);
+          __HAL_UART_ENABLE_IT(huart_, UART_IT_IDLE);
+
+          // if no rx/tx static buffers supplied, create them dynamically
+          if (tx_buff_ == nullptr)
+            {
+              if ((tx_buff_ = (uint8_t *) malloc (tx_buff_size_)) == nullptr)
+                {
+                  errno = ENOMEM;
+                  break;
+                }
+              else
+                {
+                  tx_buff_dyn_ = true;
+                }
+            }
+          else
+            {
+              tx_buff_dyn_ = false;
+            }
+
+          if (rx_buff_ == nullptr)
+            {
+              if ((rx_buff_ = (uint8_t *) malloc (rx_buff_size_)) == nullptr)
+                {
+                  errno = ENOMEM;
+                  break;
+                }
+              else
+                {
+                  rx_buff_dyn_ = true;
+                }
+            }
+          else
+            {
+              rx_buff_dyn_ = false;
+            }
+
+          // set initial timeout to infinitum (i.e. blocking)
+          rx_timeout_ = 0xFFFFFFFF;
+
+          // initialize FIFOs and semaphores
+          tx_in_ = tx_out_ = 0;
+          rx_in_ = rx_out_ = 0;
+
+          // reset semaphores
+          tx_sem_.reset ();
+          rx_sem_.reset ();
+
+          // start receiving, basically wait for input characters
+          // check if we have DMA enabled for receive
+          if (huart_->hdmarx == nullptr)
+            {
+              // enable receive through UART interrupt transfers
+              hal_result = HAL_UART_Receive_IT (huart_, rx_buff_,
+                                                rx_buff_size_ / 2);
+            }
+          else
+            {
+              // enable receive through DMA transfers
+              hal_result = HAL_UART_Receive_DMA (huart_, rx_buff_,
+                                                 rx_buff_size_);
+            }
         }
+      while (false);
 
-      // initialize the UART
-      HAL_UART_Init (huart_);
-
-      // set initial timeout to infinitum (blocking)
-      rx_timeout_ = 0xFFFFFFFF;
-
-      // initialize FIFOs and semaphores
-      tx_in_ = tx_out_ = 0;
-      rx_in_ = rx_out_ = 0;
-
-      // reset semaphores
-      tx_sem_.reset ();
-      rx_sem_.reset ();
-
-      // clear receiver idle flag, then enable interrupt on receiver idle
-      __HAL_UART_CLEAR_IDLEFLAG(huart_);
-      __HAL_UART_ENABLE_IT(huart_, UART_IT_IDLE);
-
-      // start receiving, basically wait for input characters
-      // check if we have DMA enabled for receive
-      if (huart_->hdmarx == nullptr)
+      if (hal_result != HAL_OK)
         {
-          // this is receive via the non-DMA variant
-          result = HAL_UART_Receive_IT (huart_, rx_buff_, rx_buff_size_ / 2);
-        }
-      else
-        {
-          // this is receive via the DMA variant
-          result = HAL_UART_Receive_DMA (huart_, rx_buff_, rx_buff_size_);
-        }
-
-      if (result != HAL_OK)
-        {
-          switch (result)
+          switch (hal_result)
             {
             case HAL_BUSY:
               errno = EBUSY;
@@ -140,13 +179,14 @@ namespace os
               errno = EIO;
               break;
             }
-          return -1;
         }
       else
         {
           is_opened_ = true;
-          return 0;
+          result = 0;
         }
+
+      return result;
     }
 
     int
@@ -167,6 +207,19 @@ namespace os
       // disable interrupt on receive idle and switch off the UART
       __HAL_UART_DISABLE_IT(huart_, UART_IT_IDLE);
       HAL_UART_DeInit (huart_);
+
+      // clean-up dynamic allocations, if any
+      if (tx_buff_dyn_ == true)
+        {
+          free (tx_buff_);
+          tx_buff_ = nullptr;
+        }
+
+      if (rx_buff_dyn_ == true)
+        {
+          free (rx_buff_);
+          rx_buff_ = nullptr;
+        }
 
       is_opened_ = false;
 
@@ -224,12 +277,22 @@ namespace os
       // send the buffer, as much as it can
       if (huart_->hdmatx == nullptr)
         {
-          // the non-DMA variant
+          // non-DMA transfer
           result = HAL_UART_Transmit_IT (huart_, tx_buff_, count);
         }
       else
         {
-          // the DMA variant
+          // DMA transfer
+          // clean the data cache to mitigate incoherence before DMA transfers
+          // (all RAM except DTCM RAM is cached)
+          if ((tx_buff_ + tx_buff_size_) >= (uint8_t *) SRAM1_BASE)
+            {
+              uint32_t *aligned_buff = (uint32_t *) (((uint32_t) (tx_buff_))
+                  & 0xFFFFFFE0);
+              uint32_t aligned_count = (uint32_t) (tx_buff_size_ & 0xFFFFFFE0)
+                  + 32;
+              SCB_CleanDCache_by_Addr (aligned_buff, aligned_count);
+            }
           result = HAL_UART_Transmit_DMA (huart_, tx_buff_, count);
         }
 
@@ -262,6 +325,108 @@ namespace os
       return true;      // TODO: check DCD, but where's the DCD line?
     }
 
+    int
+    uart::do_tcgetattr (struct termios *ptio)
+    {
+      // clear termios structure
+      bzero ((void *) ptio, sizeof(struct termios));
+
+      // termios.h: CSIZE: CS5, CS6, CS7, CS8
+      // note: ST uses a standard bit for parity, must be subtracted from total
+      if (huart_->Init.Parity == UART_PARITY_NONE)
+        {
+          ptio->c_cflag =
+              huart_->Init.WordLength == UART_WORDLENGTH_9B ? 0 :
+              huart_->Init.WordLength == UART_WORDLENGTH_8B ? CS8 : CS7;
+        }
+      else
+        {
+          ptio->c_cflag =
+              huart_->Init.WordLength == UART_WORDLENGTH_9B ? CS8 :
+              huart_->Init.WordLength == UART_WORDLENGTH_8B ? CS7 : CS6;
+        }
+
+      // termios.h: CSTOPB: if true, two stop bits, otherwise only one
+      ptio->c_cflag |= huart_->Init.StopBits == UART_STOPBITS_2 ? CSTOPB : 0;
+
+      // termios.h: flags PARENB = parity enabled, PARODD = parity odd
+      ptio->c_cflag |= huart_->Init.Parity == UART_PARITY_NONE ? 0 : PARENB;
+      ptio->c_cflag |= huart_->Init.Parity == UART_PARITY_ODD ? PARODD : 0;
+
+      // get baud rate
+      int i;
+      for (i = 0; i < (int) sizeof(br_tab); i++)
+        {
+          if (br_tab[i] == huart_->Init.BaudRate)
+            break;
+        }
+      if (i < (int) sizeof(br_tab))
+        {
+          ptio->c_cflag |= i;
+          ptio->c_ispeed = huart_->Init.BaudRate;
+          ptio->c_ospeed = huart_->Init.BaudRate;
+        }
+
+      return 0;
+    }
+
+    int
+    uart::do_tcsetattr (int options, const struct termios *ptio)
+    {
+      HAL_StatusTypeDef result;
+
+      // set parity
+      huart_->Init.Parity =
+          ptio->c_cflag & PARENB ?
+              (ptio->c_cflag & PARODD ? UART_PARITY_ODD : UART_PARITY_EVEN) :
+              UART_PARITY_NONE;
+
+      // set character size
+      if (huart_->Init.Parity == UART_PARITY_NONE)
+        {
+          // ST UARTs can't do 6 and 5 bit characters, they do however 9 bit
+          huart_->Init.WordLength =
+              ptio->c_cflag & CS8 ? UART_WORDLENGTH_8B :
+              ptio->c_cflag & CS7 ? UART_WORDLENGTH_7B : UART_WORDLENGTH_9B;
+        }
+      else
+        {
+          huart_->Init.WordLength =
+              ptio->c_cflag & CS8 ? UART_WORDLENGTH_9B :
+              ptio->c_cflag & CS7 ? UART_WORDLENGTH_8B : UART_WORDLENGTH_7B;
+        }
+
+      // set number of stop bits
+      huart_->Init.StopBits =
+          ptio->c_cflag & CSTOPB ? UART_STOPBITS_2 : UART_STOPBITS_1;
+
+      // set baud rate; if baud rates in c_cflag are not specified, we use
+      // the values in c_ispeed or c_ospeed
+      huart_->Init.BaudRate =
+          ptio->c_cflag & 037 /* see note */? br_tab[ptio->c_cflag & 037] :
+          ptio->c_ispeed ? ptio->c_ispeed : ptio->c_ospeed;
+      // note: the 037 mask (octal!) is defined in termios.h as CBAUD, but
+      // its availability is conditional in the header file currently used;
+      // hopefully this issue will be clarified in a future version of µOS++.
+
+      if ((result = UART_SetConfig (huart_)) != HAL_OK)
+        {
+           switch (result)
+            {
+            case HAL_BUSY:
+              errno = EBUSY;
+              break;
+
+            default:
+              errno = EIO;
+              break;
+            }
+           return -1;
+        }
+
+      return 0;
+    }
+
     /**
      * @brief  Transmit event call-back.
      */
@@ -285,13 +450,13 @@ namespace os
       // compute the number of chars received during the last transfer
       if (huart_->hdmarx == nullptr)
         {
-          // non DMA xfer
+          // non-DMA transfer
           xfered = rx_in_ - (rx_in_ >= half_buffer_size ? half_buffer_size : 0);
           xfered = half_buffer_size - xfered - huart_->RxXferCount;
         }
       else
         {
-          // DMA xfer
+          // DMA transfer
           xfered = rx_buff_size_ - rx_in_ - huart_->hdmarx->Instance->NDTR;
         }
 
@@ -305,6 +470,7 @@ namespace os
       // re-initialize system for receiving
       if (huart_->hdmarx == nullptr)
         {
+          // non-DMA transfer
           if (huart_->RxXferCount == 0)
             {
               HAL_UART_Receive_IT (
@@ -314,6 +480,19 @@ namespace os
         }
       else
         {
+          // DMA transfer
+          // flush and clean the data cache to mitigate incoherence after
+          // DMA transfers (all but the DTCM RAM is cached)
+          if ((rx_buff_ + rx_buff_size_) >= (uint8_t *) SRAM1_BASE)
+            {
+              uint32_t *aligned_buff = (uint32_t *) (((uint32_t) (rx_buff_))
+                  & 0xFFFFFFE0);
+              uint32_t aligned_count = (uint32_t) (rx_buff_size_ & 0xFFFFFFE0)
+                  + 32;
+              SCB_CleanInvalidateDCache_by_Addr (aligned_buff, aligned_count);
+            }
+
+          // reload DMA receive
           if (half == false && rx_in_ == 0)
             {
               HAL_UART_Receive_DMA (huart_, rx_buff_, rx_buff_size_);
