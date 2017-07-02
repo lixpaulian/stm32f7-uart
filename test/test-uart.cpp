@@ -61,10 +61,10 @@ uint8_t tx_buffer[TX_BUFFER_SIZE];
 uint8_t rx_buffer[RX_BUFFER_SIZE];
 
 static ssize_t
-targeted_read (int filedes, char *buffer, size_t size);
+targeted_read (int filedes, char *buffer, size_t expected_size);
 
 driver::uart uart6
-  { "uart6", &huart6, tx_buffer, rx_buffer, sizeof(tx_buffer), sizeof(rx_buffer) };
+  { "uart6", &huart6, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE };
 
 void
 HAL_UART_TxCpltCallback (UART_HandleTypeDef *huart)
@@ -136,6 +136,10 @@ test_uart (void)
         }
       else
         {
+          struct termios tios;
+
+          uart6.do_tcgetattr (&tios);
+
           for (int j = 0; j < WRITE_READ_ROUNDS; j++)
             {
               // send text
@@ -188,26 +192,26 @@ test_uart (void)
 }
 
 /**
- * @brief This function waits to read a known amount of bytes before returning
- * @param fd: file descriptor
+ * @brief This function waits to read a known amount of bytes before returning.
+ * @param fd: file descriptor.
  * @param buffer: buffer to return data into.
- * @param size: the targeted amount of characters to wait for
+ * @param expected_size: the expected number of characters to wait for.
  * @return The number of characters read or an error if negative.
  */
 static ssize_t
-targeted_read (int fd, char *buffer, size_t size)
+targeted_read (int fd, char *buffer, size_t expected_size)
 {
   int count, total = 0;
 
   do
     {
-      if ((count = read (fd, buffer + total, size - total)) < 0)
+      if ((count = read (fd, buffer + total, expected_size - total)) < 0)
         {
           break;
         }
       total += count;
     }
-  while (total < (int) size);
+  while (total < (int) expected_size);
 
   return total;
 }
