@@ -24,6 +24,9 @@
 #endif
 #endif
 
+#ifndef _TERMIOS_H
+#define _TERMIOS_H
+
 typedef unsigned char	cc_t;
 typedef unsigned int	speed_t;
 typedef unsigned int	tcflag_t;
@@ -226,3 +229,5 @@ struct termios
 
 #define _IOT_termios /* Hurd ioctl type field.  */ \
   _IOT (_IOTS (cflag_t), 4, _IOTS (cc_t), NCCS, _IOTS (speed_t), 2)
+
+#endif // _TERMIOS_H
