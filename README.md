@@ -1,6 +1,16 @@
 # stm32f7-uart
 This is a USART driver for the STM32F7xx family of controllers.
 
+The driver is functional, but there is still much work to do. What is still missing (and the list is probably incomplete):
+* Error handling (parity, framing, etc.)
+* Further implementation of serial port control through termios related functions (`tcgetattr` and `tcsetattr`) and `fcntl`
+* Software handshaking protocol (XON/XOFF)
+* DCD signal handling (and perhaps modem signals handling too?)
+* CTS/DTR support
+* RS-485 support
+
+The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu plans to support `termios` and friends in an upcoming version of the µOS++. Until then there is a `termios.h` header file included with the driver. The lack of newlib support means that you cannot call `tcgetattr` and `tcsetattr`. However, you can access these functions directly from the driver (see the test example).
+
 ## Version
 * 0.4 (2 July 2017)
 
@@ -37,7 +47,7 @@ If data comes in bursts, each idle character determines an interupt and the data
 
 A similar approach is used for the interrupt based receive, with a simulated "half-complete" transfer implemented in software by dividing the internal buffer in two equal parts.
 
-Because the UART HAL libraries does not handle interrupt on idle, this must be done manually in case of CubeMX generated files:
+Because the UART HAL libraries does not handle interrupt on idle, this must be done manually if you generate your files with CubeMX, as shown below (this is in the generated file `stm32f7xx_it.c`):
 
 ``
 /**
@@ -62,6 +72,6 @@ void USART6_IRQHandler(void)
 ## Tests
 A separate directory `test` is included that opens a serial port, reads the main serial parameters, then writes a string and receives it 10 times in a loop, then closes the port. The open/write/read/close cycle is repeated 10 times before the progarm exits.
 
-Obviously, in order to function, you must close the RxD and TxD of your UART in a loop.
+Obviously, in order to function, you must short the RxD and TxD of your UART together.
 
 
