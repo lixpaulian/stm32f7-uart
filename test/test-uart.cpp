@@ -136,9 +136,24 @@ test_uart (void)
         }
       else
         {
+          // get serial port parameters
           struct termios tios;
-
-          uart6.do_tcgetattr (&tios);
+          if (uart6.do_tcgetattr (&tios) < 0)
+            {
+              trace::printf ("Error getting serial port parameters\n");
+            }
+          else
+            {
+              trace::printf (
+                  "Serial port parameters: "
+                  "%d baud, %d bits, %d stop bit(s), %s parity\r\n",
+                  tios.c_ispeed,
+                  (tios.c_cflag & CSIZE) == CS7 ? 7 :
+                  (tios.c_cflag & CSIZE) == CS8 ? 8 : 9,
+                  tios.c_cflag & CSTOPB ? 2 : 1,
+                  tios.c_cflag & PARENB ?
+                      tios.c_cflag & PARODD ? "odd" : "even" : "no");
+            }
 
           for (int j = 0; j < WRITE_READ_ROUNDS; j++)
             {
