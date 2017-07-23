@@ -32,10 +32,6 @@
 
 #include "uart-drv.h"
 
-static const speed_t br_tab[] =
-  { 0, 50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800, 9600,
-      19200, 38400, 57600, 115200, 230400, 460800, 500000, 576000, 921600 };
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
@@ -107,7 +103,7 @@ namespace os
           // if no rx/tx static buffers supplied, create them dynamically
           if (tx_buff_ == nullptr)
             {
-              if ((tx_buff_ = (uint8_t *) malloc (tx_buff_size_)) == nullptr)
+              if ((tx_buff_ = new uint8_t[tx_buff_size_]) == nullptr)
                 {
                   errno = ENOMEM;
                   break;
@@ -124,7 +120,7 @@ namespace os
 
           if (rx_buff_ == nullptr)
             {
-              if ((rx_buff_ = (uint8_t *) malloc (rx_buff_size_)) == nullptr)
+              if ((rx_buff_ = new uint8_t[rx_buff_size_]) == nullptr)
                 {
                   errno = ENOMEM;
                   break;
@@ -211,13 +207,13 @@ namespace os
       // clean-up dynamic allocations, if any
       if (tx_buff_dyn_ == true)
         {
-          free (tx_buff_);
+          delete[] tx_buff_;
           tx_buff_ = nullptr;
         }
 
       if (rx_buff_dyn_ == true)
         {
-          free (rx_buff_);
+          delete[] rx_buff_;
           rx_buff_ = nullptr;
         }
 
@@ -231,10 +227,16 @@ namespace os
     {
       uint8_t* lbuf = (uint8_t *) buf;
       ssize_t count = 0;
-      int c;
 
       while (rx_out_ == rx_in_)
         {
+          if (is_error_ == true)
+            {
+              is_error_ = false;
+              errno = EIO;
+              return -1;
+            }
+
           if (rx_sem_.timed_wait (rx_timeout_) != os::rtos::result::ok)
             {
               return count;     // timeout, return 0 chars
@@ -243,25 +245,13 @@ namespace os
 
       while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
         {
-          c = rx_buff_[rx_out_++];
-
-          // TODO: handle UART errors here (PE, FE, etc.)
-          if (c >= 0)
+          *lbuf++ = rx_buff_[rx_out_++];
+          count++;
+          if (rx_out_ >= rx_buff_size_)
             {
-              *lbuf++ = c;
-              count++;
-              if (rx_out_ >= rx_buff_size_)
-                {
-                  rx_out_ = 0;
-                }
-            }
-          else
-            {
-              count = c;
-              break;
+              rx_out_ = 0;
             }
         }
-
       return count;
     }
 
@@ -274,7 +264,7 @@ namespace os
       tx_sem_.wait ();
       memcpy (tx_buff_, buf, count = std::min (tx_buff_size_, nbyte));
 
-      // send the buffer, as much as it can
+      // send the buffer, as much as we can
       if (huart_->hdmatx == nullptr)
         {
           // non-DMA transfer
@@ -328,10 +318,10 @@ namespace os
     int
     uart::do_tcgetattr (struct termios *ptio)
     {
-      // clear termios structure
+      // clear the termios structure
       bzero ((void *) ptio, sizeof(struct termios));
 
-      // termios.h: CSIZE: CS5, CS6, CS7, CS8
+      // termios.h: CSIZE: CS5, CS6, CS7, CS8; ST can CS7 and CS8 only
       // note: ST uses a standard bit for parity, must be subtracted from total
       if (huart_->Init.Parity == UART_PARITY_NONE)
         {
@@ -354,18 +344,8 @@ namespace os
       ptio->c_cflag |= huart_->Init.Parity == UART_PARITY_ODD ? PARODD : 0;
 
       // get baud rate
-      int i;
-      for (i = 0; i < (int) sizeof(br_tab); i++)
-        {
-          if (br_tab[i] == huart_->Init.BaudRate)
-            break;
-        }
-      if (i < (int) sizeof(br_tab))
-        {
-          ptio->c_cflag |= i;
-          ptio->c_ispeed = huart_->Init.BaudRate;
-          ptio->c_ospeed = huart_->Init.BaudRate;
-        }
+      ptio->c_ispeed = huart_->Init.BaudRate;
+      ptio->c_ospeed = huart_->Init.BaudRate;
 
       return 0;
     }
@@ -374,6 +354,13 @@ namespace os
     uart::do_tcsetattr (int options, const struct termios *ptio)
     {
       HAL_StatusTypeDef result;
+
+      // ST UARTS support only 7 and 8 bit chars
+      if ((ptio->c_cflag & CSIZE) < CS7)
+        {
+          errno = EINVAL;
+          return -1;
+        }
 
       // set parity
       huart_->Init.Parity =
@@ -384,37 +371,31 @@ namespace os
       // set character size
       if (huart_->Init.Parity == UART_PARITY_NONE)
         {
-          // ST UARTs can't do 6 and 5 bit characters, they do however 9 bit
+          // ST UARTs can't do 6 and 5 bit characters, only 7, 8 and 9
           huart_->Init.WordLength =
-              ptio->c_cflag & CS8 ? UART_WORDLENGTH_8B :
-              ptio->c_cflag & CS7 ? UART_WORDLENGTH_7B : UART_WORDLENGTH_9B;
+              (ptio->c_cflag & CSIZE) == CS8 ?
+                  UART_WORDLENGTH_8B : UART_WORDLENGTH_7B;
         }
       else
         {
           huart_->Init.WordLength =
-              ptio->c_cflag & CS8 ? UART_WORDLENGTH_9B :
-              ptio->c_cflag & CS7 ? UART_WORDLENGTH_8B : UART_WORDLENGTH_7B;
+              (ptio->c_cflag & CSIZE) == CS8 ?
+                  UART_WORDLENGTH_9B : UART_WORDLENGTH_8B;
         }
 
       // set number of stop bits
       huart_->Init.StopBits =
           ptio->c_cflag & CSTOPB ? UART_STOPBITS_2 : UART_STOPBITS_1;
 
-      // set baud rate; if baud rates in c_cflag are not specified, we use
-      // the values in c_ispeed or c_ospeed
-      huart_->Init.BaudRate =
-          ptio->c_cflag & 037 /* see note */? br_tab[ptio->c_cflag & 037] :
-          ptio->c_ispeed ? ptio->c_ispeed : ptio->c_ospeed;
-      // note: the 037 mask (octal!) is defined in termios.h as CBAUD, but
-      // its availability is conditional in the header file currently used;
-      // hopefully this issue will be clarified in a future version of µOS++.
+      // set baud rate TODO: should we really close the stream if baud rate is 0?
+      huart_->Init.BaudRate = ptio->c_ispeed ? ptio->c_ispeed : ptio->c_ospeed;
 
-      // TODO: handle options
+      // TODO: handle more options
 
-      // before sending the new configuration, stop UART
+      // before sending the new configuration, stop the UART
       __HAL_UART_DISABLE(huart_);
 
-      // send config and restart UART
+      // send configuration and restart UART
       result = UART_SetConfig (huart_);
       __HAL_UART_ENABLE(huart_);
 
@@ -427,7 +408,7 @@ namespace os
               break;
 
             default:
-              errno = EIO;
+              errno = EINVAL;
               break;
             }
           return -1;
@@ -454,9 +435,11 @@ namespace os
       size_t xfered;
       size_t half_buffer_size = rx_buff_size_ / 2;
 
-      // TODO: handle errors (PE, FE, etc.) Caution: the errors should be
-      // read directly from the UART instance, as the interrupt on idle
-      // does not pass through the HAL interrupt handler!
+      // handle errors (PE, FE, etc.), if any
+      if (huart_->ErrorCode != HAL_UART_ERROR_NONE)
+        {
+          is_error_ = true;
+        }
 
       // compute the number of chars received during the last transfer
       if (huart_->hdmarx == nullptr)
@@ -482,7 +465,8 @@ namespace os
       if (huart_->hdmarx == nullptr)
         {
           // for non-DMA transfer
-          if (huart_->RxXferCount == 0)
+          if (huart_->RxXferCount == 0 //
+          || huart_->ErrorCode != HAL_UART_ERROR_NONE)
             {
               HAL_UART_Receive_IT (
                   huart_, rx_in_ == 0 ? rx_buff_ : rx_buff_ + half_buffer_size,
@@ -504,7 +488,8 @@ namespace os
             }
 
           // reload DMA receive
-          if (half == false && rx_in_ == 0)
+          if ((half == false && rx_in_ == 0)
+              || huart_->ErrorCode != HAL_UART_ERROR_NONE)
             {
               HAL_UART_Receive_DMA (huart_, rx_buff_, rx_buff_size_);
             }

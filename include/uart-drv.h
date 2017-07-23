@@ -30,12 +30,12 @@
 #ifndef INCLUDE_UART_DRV_H_
 #define INCLUDE_UART_DRV_H_
 
+#include <termios.h>
 #include "cmsis_device.h"
 #include "stm32f7xx_hal_usart.h"
 
 #include <cmsis-plus/rtos/os.h>
 #include <cmsis-plus/posix-io/device-char.h>
-#include <termios.h>
 
 #if defined (__cplusplus)
 
@@ -109,7 +109,7 @@ namespace os
     private:
 
       static constexpr uint8_t UART_DRV_VERSION_MAJOR = 0;
-      static constexpr uint8_t UART_DRV_VERSION_MINOR = 4;
+      static constexpr uint8_t UART_DRV_VERSION_MINOR = 5;
 
       UART_HandleTypeDef* huart_;
       uint8_t* tx_buff_;
@@ -127,6 +127,7 @@ namespace os
 
       bool volatile is_connected_ = false;
       bool volatile is_opened_ = false;
+      bool volatile is_error_ = false;
 
       os::rtos::semaphore_binary tx_sem_
         { "tx", 1 };
