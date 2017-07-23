@@ -1,233 +1,247 @@
-/* termios type and macro definitions.  Linux version.
-   Copyright (C) 1993, 1994, 1995, 1996, 1997, 1999, 2003, 2005
-	Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
+/*-
+ * Copyright (c) 1988, 1989, 1993, 1994
+ *	The Regents of the University of California.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)termios.h	8.3 (Berkeley) 3/28/94
+ * $FreeBSD$
+ */
 
-   The GNU C Library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation; either
-   version 2.1 of the License, or (at your option) any later version.
+/*
+ * Adapted for µOS++ as an initial solution to the missing termios header in the
+ * embedded newlib. Should be included in the µOS++ package.
+ *
+ * 13 July 2017 (LNP) - no additional rights claimed.
+ */
 
-   The GNU C Library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
+#ifndef _SYS__TERMIOS_H_
+#define	_SYS__TERMIOS_H_
 
-   You should have received a copy of the GNU Lesser General Public
-   License along with the GNU C Library; if not, write to the Free
-   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-   02111-1307 USA.  */
-
-#if 0
-#ifndef _TERMIOS_H
-# error "Never include <bits/termios.h> directly; use <termios.h> instead."
+/*
+ * Special Control Characters
+ *
+ * Index into c_cc[] character array.
+ *
+ *	Name	     Subscript	Enabled by
+ */
+#define	VEOF		0	/* ICANON */
+#define	VEOL		1	/* ICANON */
+#if __BSD_VISIBLE
+#define	VEOL2		2	/* ICANON together with IEXTEN */
 #endif
+#define	VERASE		3	/* ICANON */
+#if __BSD_VISIBLE
+#define	VWERASE 	4	/* ICANON together with IEXTEN */
+#endif
+#define	VKILL		5	/* ICANON */
+#if __BSD_VISIBLE
+#define	VREPRINT 	6	/* ICANON together with IEXTEN */
+#define	VERASE2 	7	/* ICANON */
+#endif
+/*			7	   ex-spare 1 */
+#define	VINTR		8	/* ISIG */
+#define	VQUIT		9	/* ISIG */
+#define	VSUSP		10	/* ISIG */
+#if __BSD_VISIBLE
+#define	VDSUSP		11	/* ISIG together with IEXTEN */
+#endif
+#define	VSTART		12	/* IXON, IXOFF */
+#define	VSTOP		13	/* IXON, IXOFF */
+#if __BSD_VISIBLE
+#define	VLNEXT		14	/* IEXTEN */
+#define	VDISCARD	15	/* IEXTEN */
+#endif
+#define	VMIN		16	/* !ICANON */
+#define	VTIME		17	/* !ICANON */
+#if __BSD_VISIBLE
+#define	VSTATUS		18	/* ICANON together with IEXTEN */
+/*			19	   spare 2 */
+#endif
+#define	NCCS		20
+
+#define	_POSIX_VDISABLE	0xff
+
+/*
+ * Input flags - software input processing
+ */
+#define	IGNBRK		0x00000001	/* ignore BREAK condition */
+#define	BRKINT		0x00000002	/* map BREAK to SIGINTR */
+#define	IGNPAR		0x00000004	/* ignore (discard) parity errors */
+#define	PARMRK		0x00000008	/* mark parity and framing errors */
+#define	INPCK		0x00000010	/* enable checking of parity errors */
+#define	ISTRIP		0x00000020	/* strip 8th bit off chars */
+#define	INLCR		0x00000040	/* map NL into CR */
+#define	IGNCR		0x00000080	/* ignore CR */
+#define	ICRNL		0x00000100	/* map CR to NL (ala CRMOD) */
+#define	IXON		0x00000200	/* enable output flow control */
+#define	IXOFF		0x00000400	/* enable input flow control */
+#if __BSD_VISIBLE
+#define	IXANY		0x00000800	/* any char will restart after stop */
+#define	IMAXBEL		0x00002000	/* ring bell on input queue full */
 #endif
 
-#ifndef _TERMIOS_H
-#define _TERMIOS_H
+/*
+ * Output flags - software output processing
+ */
+#define	OPOST		0x00000001	/* enable following output processing */
+#if __BSD_VISIBLE
+#define	ONLCR		0x00000002	/* map NL to CR-NL (ala CRMOD) */
+#define	TABDLY		0x00000004	/* tab delay mask */
+#define	    TAB0	    0x00000000	    /* no tab delay and expansion */
+#define	    TAB3	    0x00000004	    /* expand tabs to spaces */
+#define	ONOEOT		0x00000008	/* discard EOT's (^D) on output) */
+#define	OCRNL		0x00000010	/* map CR to NL on output */
+#define	ONOCR		0x00000020	/* no CR output at column 0 */
+#define	ONLRET		0x00000040	/* NL performs CR function */
+#endif
 
+/*
+ * Control flags - hardware control of terminal
+ */
+#if __BSD_VISIBLE
+#define	CIGNORE		0x00000001	/* ignore control flags */
+#endif
+#define	CSIZE		0x00000300	/* character size mask */
+#define	    CS5		    0x00000000	    /* 5 bits (pseudo) */
+#define	    CS6		    0x00000100	    /* 6 bits */
+#define	    CS7		    0x00000200	    /* 7 bits */
+#define	    CS8		    0x00000300	    /* 8 bits */
+#define	CSTOPB		0x00000400	/* send 2 stop bits */
+#define	CREAD		0x00000800	/* enable receiver */
+#define	PARENB		0x00001000	/* parity enable */
+#define	PARODD		0x00002000	/* odd parity, else even */
+#define	HUPCL		0x00004000	/* hang up on last close */
+#define	CLOCAL		0x00008000	/* ignore modem status lines */
+#if __BSD_VISIBLE
+#define	CCTS_OFLOW	0x00010000	/* CTS flow control of output */
+#define	CRTSCTS		(CCTS_OFLOW | CRTS_IFLOW)
+#define	CRTS_IFLOW	0x00020000	/* RTS flow control of input */
+#define	CDTR_IFLOW	0x00040000	/* DTR flow control of input */
+#define	CDSR_OFLOW	0x00080000	/* DSR flow control of output */
+#define	CCAR_OFLOW	0x00100000	/* DCD flow control of output */
+#endif
+
+
+/*
+ * "Local" flags - dumping ground for other state
+ *
+ * Warning: some flags in this structure begin with
+ * the letter "I" and look like they belong in the
+ * input flag.
+ */
+
+#if __BSD_VISIBLE
+#define	ECHOKE		0x00000001	/* visual erase for line kill */
+#endif
+#define	ECHOE		0x00000002	/* visually erase chars */
+#define	ECHOK		0x00000004	/* echo NL after line kill */
+#define	ECHO		0x00000008	/* enable echoing */
+#define	ECHONL		0x00000010	/* echo NL even if ECHO is off */
+#if __BSD_VISIBLE
+#define	ECHOPRT		0x00000020	/* visual erase mode for hardcopy */
+#define	ECHOCTL  	0x00000040	/* echo control chars as ^(Char) */
+#endif
+#define	ISIG		0x00000080	/* enable signals INTR, QUIT, [D]SUSP */
+#define	ICANON		0x00000100	/* canonicalize input lines */
+#if __BSD_VISIBLE
+#define	ALTWERASE	0x00000200	/* use alternate WERASE algorithm */
+#endif
+#define	IEXTEN		0x00000400	/* enable DISCARD and LNEXT */
+#define	EXTPROC         0x00000800      /* external processing */
+#define	TOSTOP		0x00400000	/* stop background jobs from output */
+#if __BSD_VISIBLE
+#define	FLUSHO		0x00800000	/* output being flushed (state) */
+#define	NOKERNINFO	0x02000000	/* no kernel output from VSTATUS */
+#define	PENDIN		0x20000000	/* XXX retype pending input (state) */
+#endif
+#define	NOFLSH		0x80000000	/* don't flush after interrupt */
+
+/*
+ * Standard speeds
+ */
+#define	B0	0
+#define	B50	50
+#define	B75	75
+#define	B110	110
+#define	B134	134
+#define	B150	150
+#define	B200	200
+#define	B300	300
+#define	B600	600
+#define	B1200	1200
+#define	B1800	1800
+#define	B2400	2400
+#define	B4800	4800
+#define	B9600	9600
+#define	B19200	19200
+#define	B38400	38400
+#if __BSD_VISIBLE
+#define	B7200	7200
+#define	B14400	14400
+#define	B28800	28800
+#define	B57600	57600
+#define	B76800	76800
+#define	B115200	115200
+#define	B230400	230400
+#define	B460800	460800
+#define	B921600	921600
+#define	EXTA	19200
+#define	EXTB	38400
+#endif
+
+/*
+ * Commands passed to tcsetattr() for setting the termios structure.
+ */
+#define TCSANOW         0               /* make change immediate */
+#define TCSADRAIN       1               /* drain output, then change */
+#define TCSAFLUSH       2               /* drain output, flush input */
+#if __BSD_VISIBLE
+#define TCSASOFT        0x10            /* flag - don't alter h.w. state */
+#endif
+
+#define TCIFLUSH        1
+#define TCOFLUSH        2
+#define TCIOFLUSH       3
+#define TCOOFF          1
+#define TCOON           2
+#define TCIOFF          3
+#define TCION           4
+
+typedef unsigned int	tcflag_t;
 typedef unsigned char	cc_t;
 typedef unsigned int	speed_t;
-typedef unsigned int	tcflag_t;
 
-#define NCCS 32
-struct termios
-  {
-    tcflag_t c_iflag;		/* input mode flags */
-    tcflag_t c_oflag;		/* output mode flags */
-    tcflag_t c_cflag;		/* control mode flags */
-    tcflag_t c_lflag;		/* local mode flags */
-    cc_t c_cc[NCCS];		/* control characters */
-    cc_t c_line;		/* line discipline (== c_cc[33]) */
-    speed_t c_ispeed;		/* input speed */
-    speed_t c_ospeed;		/* output speed */
-#define _HAVE_STRUCT_TERMIOS_C_ISPEED 1
-#define _HAVE_STRUCT_TERMIOS_C_OSPEED 1
-  };
+struct termios {
+	tcflag_t	c_iflag;	/* input flags */
+	tcflag_t	c_oflag;	/* output flags */
+	tcflag_t	c_cflag;	/* control flags */
+	tcflag_t	c_lflag;	/* local flags */
+	cc_t		c_cc[NCCS];	/* control chars */
+	speed_t		c_ispeed;	/* input speed */
+	speed_t		c_ospeed;	/* output speed */
+};
 
-/* c_cc characters */
-#define VEOF 0
-#define VEOL 1
-#define VEOL2 2
-#define VERASE 3
-#define VWERASE 4
-#define VKILL 5
-#define VREPRINT 6
-#define VSWTC 7
-#define VINTR 8
-#define VQUIT 9
-#define VSUSP 10
-#define VSTART 12
-#define VSTOP 13
-#define VLNEXT 14
-#define VDISCARD 15
-#define VMIN 16
-#define VTIME 17
-
-/* c_iflag bits */
-#define IGNBRK	0000001
-#define BRKINT	0000002
-#define IGNPAR	0000004
-#define PARMRK	0000010
-#define INPCK	0000020
-#define ISTRIP	0000040
-#define INLCR	0000100
-#define IGNCR	0000200
-#define ICRNL	0000400
-#define IXON	0001000
-#define IXOFF	0002000
-#ifdef __USE_BSD
-  /* POSIX.1 doesn't want these... */
-# define IXANY		0004000
-# define IUCLC		0010000
-# define IMAXBEL	0020000
-# define IUTF8		0040000
-#endif
-
-/* c_oflag bits */
-#define OPOST	0000001
-#define ONLCR	0000002
-#define OLCUC	0000004
-
-#define OCRNL	0000010
-#define ONOCR	0000020
-#define ONLRET	0000040
-
-#define OFILL	00000100
-#define OFDEL	00000200
-#if defined __USE_MISC || defined __USE_XOPEN
-# define NLDLY	00001400
-# define   NL0	00000000
-# define   NL1	00000400
-# define   NL2	00001000
-# define   NL3	00001400
-# define TABDLY	00006000
-# define   TAB0	00000000
-# define   TAB1	00002000
-# define   TAB2	00004000
-# define   TAB3	00006000
-# define CRDLY	00030000
-# define   CR0	00000000
-# define   CR1	00010000
-# define   CR2	00020000
-# define   CR3	00030000
-# define FFDLY	00040000
-# define   FF0	00000000
-# define   FF1	00040000
-# define BSDLY	00100000
-# define   BS0	00000000
-# define   BS1	00100000
-#endif
-
-#define VTDLY	00200000
-#define   VT0	00000000
-#define   VT1	00200000
-
-#ifdef __USE_MISC
-# define XTABS	01000000 /* Hmm.. Linux/i386 considers this part of TABDLY.. */
-#endif
-
-/* c_cflag bit meaning */
-#ifdef __USE_MISC
-# define CBAUD	0000037
-#endif
-#define  B0	0000000		/* hang up */
-#define  B50	0000001
-#define  B75	0000002
-#define  B110	0000003
-#define  B134	0000004
-#define  B150	0000005
-#define  B200	0000006
-#define  B300	0000007
-#define  B600	0000010
-#define  B1200	0000011
-#define  B1800	0000012
-#define  B2400	0000013
-#define  B4800	0000014
-#define  B9600	0000015
-#define  B19200	0000016
-#define  B38400	0000017
-#ifdef __USE_MISC
-# define EXTA B19200
-# define EXTB B38400
-# define CBAUDEX 0000000
-#endif
-#define  B57600   00020
-#define  B115200  00021
-#define  B230400  00022
-#define  B460800  00023
-#define  B500000  00024
-#define  B576000  00025
-#define  B921600  00026
-#define  B1000000 00027
-#define  B1152000 00030
-#define  B1500000 00031
-#define  B2000000 00032
-#define  B2500000 00033
-#define  B3000000 00034
-#define  B3500000 00035
-#define  B4000000 00036
-
-#define __MAX_BAUD B4000000
-
-#define CSIZE	00001400
-#define   CS5	00000000
-#define   CS6	00000400
-#define   CS7	00001000
-#define   CS8	00001400
-
-#define CSTOPB	00002000
-#define CREAD	00004000
-#define PARENB	00010000
-#define PARODD	00020000
-#define HUPCL	00040000
-
-#define CLOCAL	00100000
-#ifdef __USE_MISC
-# define CMSPAR	  010000000000		/* mark or space (stick) parity */
-# define CRTSCTS  020000000000		/* flow control */
-#endif
-
-/* c_lflag bits */
-#define ISIG	0x00000080
-#define ICANON	0x00000100
-#if defined __USE_MISC || defined __USE_XOPEN
-# define XCASE	0x00004000
-#endif
-#define ECHO	0x00000008
-#define ECHOE	0x00000002
-#define ECHOK	0x00000004
-#define ECHONL	0x00000010
-#define NOFLSH	0x80000000
-#define TOSTOP	0x00400000
-#ifdef __USE_MISC
-# define ECHOCTL	0x00000040
-# define ECHOPRT	0x00000020
-# define ECHOKE	0x00000001
-# define FLUSHO	0x00800000
-# define PENDIN	0x20000000
-#endif
-#define IEXTEN	0x00000400
-
-/* Values for the ACTION argument to `tcflow'.  */
-#define	TCOOFF		0
-#define	TCOON		1
-#define	TCIOFF		2
-#define	TCION		3
-
-/* Values for the QUEUE_SELECTOR argument to `tcflush'.  */
-#define	TCIFLUSH	0
-#define	TCOFLUSH	1
-#define	TCIOFLUSH	2
-
-/* Values for the OPTIONAL_ACTIONS argument to `tcsetattr'.  */
-#define	TCSANOW		0
-#define	TCSADRAIN	1
-#define	TCSAFLUSH	2
-
-
-#define _IOT_termios /* Hurd ioctl type field.  */ \
-  _IOT (_IOTS (cflag_t), 4, _IOTS (cc_t), NCCS, _IOTS (speed_t), 2)
-
-#endif // _TERMIOS_H
+#endif /* !_SYS__TERMIOS_H_ */
