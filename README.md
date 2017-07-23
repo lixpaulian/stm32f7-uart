@@ -2,17 +2,16 @@
 This is a µOS++ UART driver for the STM32F7xx family of controllers.
 
 The driver is functional, but there is still much work to do. Still missing (and the list is probably incomplete):
-* Error handling (parity, framing, etc.)
 * Further implementation of serial port control through `struct termios` related functions (`tcgetattr` and `tcsetattr`) and `fcntl`
 * Software handshaking protocol (XON/XOFF)
 * DCD signal handling (and perhaps modem signals handling too?)
 * CTS/DTR support
 * RS-485 support
 
-The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu plans to support `termios` and friends in an upcoming version of the µOS++. Until then there is a `termios.h` header file included with the driver. The lack of newlib support means that you cannot call `tcgetattr` and `tcsetattr` library functions. However, you can access these functions directly from the driver (see the test example).
+The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu plans to support `termios` and friends in an upcoming version of the µOS++. Until then there is a `termios.h` header file included with the driver. The lack of newlib support means that you cannot call `tcgetattr` and `tcsetattr` library functions. However, you can still access these functions directly from the driver (see the test example).
 
 ## Version
-* 0.4 (2 July 2017)
+* 0.5 (23 July 2017)
 
 ## License
 * MIT
@@ -77,6 +76,6 @@ In general, for slow typed input and output, buffers of several tens of bytes ar
 However, if you implement a serial protocol, then the buffers should be sized according to the typical frame length of the protocol. Small buffers will still do, but the efficiency will decrease and at high speeds the driver might even lose characters.
 
 ## Tests
-A separate directory `test` is included that contains a short test program: it opens a serial port, writes a string and receives it 10 times in a loop, then closes the port. The open/write/read/close cycle is repeated 10 times before the program exits.
+A separate directory `test` is included that contains a short test program: it opens a serial port, reads the current parameters, writes a string and receives it 10 times in a loop, then closes the port. The open/write/read/close cycle is repeated 10 times before the program exits.
 
 Obviously, in order to function, you must short the RxD and TxD signals of your UART.
