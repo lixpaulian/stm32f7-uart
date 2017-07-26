@@ -1,17 +1,18 @@
 # stm32f7-uart
 This is a µOS++ UART driver for the STM32F7xx family of controllers.
 
-The driver is functional, but there is still much work to do. Still missing (and the list is probably incomplete):
+The driver is functional, but there is still some work to do. Still missing (and the list is probably incomplete):
 * Further implementation of serial port control through `struct termios` related functions (`tcgetattr` and `tcsetattr`) and `fcntl`
 * Software handshaking protocol (XON/XOFF)
 * DCD signal handling (and perhaps modem signals handling too?)
-* CTS/DTR support
 * RS-485 support
 
 The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu plans to support `termios` and friends in an upcoming version of the µOS++. Until then there is a `termios.h` header file included with the driver. The lack of newlib support means that you cannot call `tcgetattr` and `tcsetattr` library functions. However, you can still access these functions directly from the driver (see the test example).
 
+The current implementation supports CTS/RTS hardware handshaking and can be enabled/disabled over the standard termios structure.
+
 ## Version
-* 0.5 (23 July 2017)
+* 0.6 (26 July 2017)
 
 ## License
 * MIT
