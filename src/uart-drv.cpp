@@ -347,6 +347,12 @@ namespace os
       ptio->c_ispeed = huart_->Init.BaudRate;
       ptio->c_ospeed = huart_->Init.BaudRate;
 
+      // termios.h: CRTSCTS: we support only CTS/RTS flow control
+      ptio->c_cflag |=
+          huart_->Init.HwFlowCtl == UART_HWCONTROL_RTS_CTS ? CRTSCTS :
+          huart_->Init.HwFlowCtl == UART_HWCONTROL_RTS ? CRTS_IFLOW :
+          huart_->Init.HwFlowCtl == UART_HWCONTROL_CTS ? CCTS_OFLOW : 0;
+
       return 0;
     }
 
@@ -372,20 +378,25 @@ namespace os
       if (huart_->Init.Parity == UART_PARITY_NONE)
         {
           // ST UARTs can't do 6 and 5 bit characters, only 7, 8 and 9
-          huart_->Init.WordLength =
-              (ptio->c_cflag & CSIZE) == CS8 ?
-                  UART_WORDLENGTH_8B : UART_WORDLENGTH_7B;
+          huart_->Init.WordLength = (ptio->c_cflag & CSIZE) == CS8 ? //
+              UART_WORDLENGTH_8B : UART_WORDLENGTH_7B;
         }
       else
         {
-          huart_->Init.WordLength =
-              (ptio->c_cflag & CSIZE) == CS8 ?
-                  UART_WORDLENGTH_9B : UART_WORDLENGTH_8B;
+          huart_->Init.WordLength = (ptio->c_cflag & CSIZE) == CS8 ? //
+              UART_WORDLENGTH_9B : UART_WORDLENGTH_8B;
         }
 
       // set number of stop bits
       huart_->Init.StopBits =
           ptio->c_cflag & CSTOPB ? UART_STOPBITS_2 : UART_STOPBITS_1;
+
+      // set hardware flow control
+      huart_->Init.HwFlowCtl =
+          (ptio->c_cflag & CRTSCTS) == CRTSCTS ? UART_HWCONTROL_RTS_CTS :
+          (ptio->c_cflag & CRTSCTS) == CRTS_IFLOW ? UART_HWCONTROL_RTS :
+          (ptio->c_cflag & CRTSCTS) == CCTS_OFLOW ? UART_HWCONTROL_CTS :
+          UART_HWCONTROL_NONE;
 
       // set baud rate TODO: should we really close the stream if baud rate is 0?
       huart_->Init.BaudRate = ptio->c_ispeed ? ptio->c_ispeed : ptio->c_ospeed;
