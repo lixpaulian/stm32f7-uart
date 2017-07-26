@@ -118,7 +118,7 @@ test_uart (void)
 #ifdef M717
   // configure the MPI interface
   mpi_ctrl mpi
-    {};
+    { };
 
   /* set to RS232 */
   mpi.init_pins ();
@@ -146,13 +146,16 @@ test_uart (void)
             {
               trace::printf (
                   "Serial port parameters: "
-                  "%d baud, %d bits, %d stop bit(s), %s parity\r\n",
+                  "%d baud, %d bits, %d stop bit(s), %s parity, flow control %s\r\n",
                   tios.c_ispeed,
                   (tios.c_cflag & CSIZE) == CS7 ? 7 :
                   (tios.c_cflag & CSIZE) == CS8 ? 8 : 9,
                   tios.c_cflag & CSTOPB ? 2 : 1,
                   tios.c_cflag & PARENB ?
-                      tios.c_cflag & PARODD ? "odd" : "even" : "no");
+                      tios.c_cflag & PARODD ? "odd" : "even" : "no",
+                  (tios.c_cflag & CRTSCTS) == CRTSCTS ? "RTS/CTS" :
+                  (tios.c_cflag & CRTSCTS) == CCTS_OFLOW ? "CTS" :
+                  (tios.c_cflag & CRTSCTS) == CRTS_IFLOW ? "RTS" : "none");
             }
 
           for (int j = 0; j < WRITE_READ_ROUNDS; j++)
