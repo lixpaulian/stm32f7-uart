@@ -31,6 +31,7 @@
 #define INCLUDE_UART_DRV_H_
 
 #include <termios.h>
+#include <fcntl.h>
 #include "cmsis_device.h"
 #include "stm32f7xx_hal_usart.h"
 
@@ -38,6 +39,10 @@
 #include <cmsis-plus/posix-io/device-char.h>
 
 #if defined (__cplusplus)
+
+
+__attribute__((weak)) int send_break (UART_HandleTypeDef* huart, int duration);
+
 
 namespace os
 {
@@ -82,6 +87,9 @@ namespace os
       int
       do_tcsetattr (int options, const struct termios *ptio);
 
+      int
+      do_tcsendbreak (int duration);
+
       // --------------------------------------------------------------------
 
     protected:
@@ -108,8 +116,10 @@ namespace os
 
     private:
 
+
+
       static constexpr uint8_t UART_DRV_VERSION_MAJOR = 0;
-      static constexpr uint8_t UART_DRV_VERSION_MINOR = 6;
+      static constexpr uint8_t UART_DRV_VERSION_MINOR = 7;
 
       UART_HandleTypeDef* huart_;
       uint8_t* tx_buff_;
@@ -129,6 +139,12 @@ namespace os
       bool volatile is_opened_ = false;
       bool volatile is_error_ = false;
 
+      bool volatile o_nonblock_ = false;
+
+      uint8_t volatile cc_vmin_ = 1; // at least one character should be received
+      uint8_t volatile cc_vtime_ = 0; // timeout indefinitely
+      uint8_t volatile cc_vtime_milli_ = 0; // extension to VTIME: timeout in ms
+
       os::rtos::semaphore_binary tx_sem_
         { "tx", 1 };
       os::rtos::semaphore_binary rx_sem_
@@ -145,6 +161,12 @@ namespace os
     {
       version_major = UART_DRV_VERSION_MAJOR;
       version_minor = UART_DRV_VERSION_MINOR;
+    }
+
+    inline int
+    uart::do_tcsendbreak (int duration)
+    {
+      return send_break (huart_, duration);
     }
 
   } /* namespace driver */
