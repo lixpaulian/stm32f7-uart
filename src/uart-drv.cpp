@@ -35,6 +35,15 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
+// this function may be replaced in case the default break supplied by the HAL
+// library is insufficient; otherwise, a user supplied function must be provided.
+__attribute__((weak)) int
+send_break (UART_HandleTypeDef* huart, int duration)
+{
+  __HAL_UART_SEND_REQ(huart, UART_SENDBREAK_REQUEST);
+  return 0;
+}
+
 namespace os
 {
   namespace driver
@@ -91,9 +100,25 @@ namespace os
             }
 
           // initialize the UART
-          if ((hal_result = HAL_UART_Init (huart_)) != HAL_OK)
+          if (oflag & O_RS485)
             {
-              break;
+              uint32_t rs485_setting = va_arg(args, uint32_t);
+
+              if ((hal_result = HAL_RS485Ex_Init (huart_, //
+                  rs485_setting & RS485_POLARITY ? //
+                  UART_DE_POLARITY_HIGH :
+                  UART_DE_POLARITY_LOW, //
+                  rs485_setting & 0xFF, (rs485_setting & 0xFF) >> 8)) != HAL_OK)
+                {
+                  break;
+                }
+            }
+          else
+            {
+              if ((hal_result = HAL_UART_Init (huart_)) != HAL_OK)
+                {
+                  break;
+                }
             }
 
           // clear receiver idle flag, then enable interrupt on receiver idle
@@ -135,8 +160,17 @@ namespace os
               rx_buff_dyn_ = false;
             }
 
-          // set initial timeout to infinitum (i.e. blocking)
-          rx_timeout_ = 0xFFFFFFFF;
+          // set initial timeout depending on the O_NONBLOCK flag
+          if (oflag & O_NONBLOCK)
+            {
+              rx_timeout_ = 0x0;
+              o_nonblock_ = true;
+            }
+          else
+            {
+              rx_timeout_ = 0xFFFFFFFF;
+              o_nonblock_ = false;
+            }
 
           // initialize FIFOs and semaphores
           tx_in_ = tx_out_ = 0;
@@ -227,31 +261,41 @@ namespace os
     {
       uint8_t* lbuf = (uint8_t *) buf;
       ssize_t count = 0;
+      os::rtos::clock::duration_t timeout;
 
-      while (rx_out_ == rx_in_)
+      do
         {
-          if (is_error_ == true)
+          if (rx_out_ == rx_in_)
             {
-              is_error_ = false;
-              errno = EIO;
-              return -1;
+              if (is_error_ == true)
+                {
+                  is_error_ = false;
+                  errno = EIO;
+                  count = -1;
+                  break;  // an error was reported, exit
+                }
+
+              // determine the timeout value
+              timeout = o_nonblock_ ? 0 :
+                        (cc_vmin_ > count) ? 0xFFFFFFFF : rx_timeout_;
+              if (rx_sem_.timed_wait (timeout) != os::rtos::result::ok)
+                {
+                  break;  // timeout, return number of chars collected, if any
+                }
             }
 
-          if (rx_sem_.timed_wait (rx_timeout_) != os::rtos::result::ok)
+          while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
             {
-              return count;     // timeout, return 0 chars
+              *lbuf++ = rx_buff_[rx_out_++];
+              count++;
+              if (rx_out_ >= rx_buff_size_)
+                {
+                  rx_out_ = 0;
+                }
             }
         }
+      while (count < cc_vmin_);
 
-      while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
-        {
-          *lbuf++ = rx_buff_[rx_out_++];
-          count++;
-          if (rx_out_ >= rx_buff_size_)
-            {
-              rx_out_ = 0;
-            }
-        }
       return count;
     }
 
@@ -353,6 +397,12 @@ namespace os
           huart_->Init.HwFlowCtl == UART_HWCONTROL_RTS ? CRTS_IFLOW :
           huart_->Init.HwFlowCtl == UART_HWCONTROL_CTS ? CCTS_OFLOW : 0;
 
+      // termios.h: retrieve supported control characters (c_cc[])
+      ptio->c_cc[VMIN] = cc_vmin_;
+      ptio->c_cc[VTIME] = cc_vtime_;
+      // we use the "spare 2" character for a fine grained delay (1 ms)
+      ptio->c_cc[VTIME + 2] = cc_vtime_milli_;
+
       return 0;
     }
 
@@ -398,8 +448,32 @@ namespace os
           (ptio->c_cflag & CRTSCTS) == CCTS_OFLOW ? UART_HWCONTROL_CTS :
           UART_HWCONTROL_NONE;
 
-      // set baud rate TODO: should we really close the stream if baud rate is 0?
+      // set baud rate TODO: should we really close the port if baud rate is 0?
       huart_->Init.BaudRate = ptio->c_ispeed ? ptio->c_ispeed : ptio->c_ospeed;
+
+      cc_vmin_ = ptio->c_cc[VMIN];
+      cc_vtime_ = ptio->c_cc[VTIME];
+      // we expect in the "spare 2" character the fine grained delay (1 ms)
+      cc_vtime_milli_ =
+          (ptio->c_cc[VTIME + 2] > 99) ? 0 : ptio->c_cc[VTIME + 2];
+
+      // compute rx timeout
+      if (o_nonblock_)
+        {
+          rx_timeout_ = 0;
+        }
+      else
+        {
+          if (cc_vtime_ == 0)
+            {
+              rx_timeout_ = 0xFFFFFFFF;
+            }
+          else
+            {
+              // VTIME is expressed in 0.1 seconds
+              rx_timeout_ = cc_vtime_ * 100 + cc_vtime_milli_;
+            }
+        }
 
       // TODO: handle more options
 
@@ -472,7 +546,7 @@ namespace os
           rx_in_ = 0;
         }
 
-      // re-initialize system for receiving
+      // re-initialize system for receive
       if (huart_->hdmarx == nullptr)
         {
           // for non-DMA transfer

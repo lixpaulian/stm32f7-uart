@@ -1,18 +1,45 @@
 # stm32f7-uart
 This is a µOS++ UART driver for the STM32F7xx family of controllers.
 
-The driver is functional, but there is still some work to do. Still missing (and the list is probably incomplete):
+The driver is functional, but several features are still missing (and the list is probably incomplete):
 * Further implementation of serial port control through `struct termios` related functions (`tcgetattr` and `tcsetattr`) and `fcntl`
 * Software handshaking protocol (XON/XOFF)
 * DCD signal handling (and perhaps modem signals handling too?)
-* RS-485 support
+* The `fcntl` call
 
-The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu plans to support `termios` and friends in an upcoming version of the µOS++. Until then there is a `termios.h` header file included with the driver. The lack of newlib support means that you cannot call `tcgetattr` and `tcsetattr` library functions. However, you can still access these functions directly from the driver (see the test example).
+The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu plans to support `termios` and friends in an upcoming version of the µOS++. Until then the `termios.h` and `fcntl.h` header files have been included with the driver. The lack of newlib support means that you cannot call `tcgetattr` and `tcsetattr` library functions. However, you can still access these functions directly from the driver (see the test example).
 
-The current implementation supports CTS/RTS hardware handshaking and can be enabled/disabled over the standard termios structure.
+The current implementation supports CTS/RTS hardware handshaking and can be enabled/disabled over the standard termios structure. This functionality is implemented by the HAL, and the STM32F7xx hardware.
+
+The driver supports RS-485 half-duplex operation. There are two aspects to consider:
+
+* POSIX does not support explicitely RS-485 mode, therefore as an initial solution a new flag has been defined (O_RS485) that must be used when opening a port in RS-485 mode. Thus to open a port in RS-485 mode, you should do:
+
+```c
+	#define DEAT 10
+	#define DEDT 12
+	uint32_t mode = RS485_POLARITY | (DEDT << 8) | DEAT;
+	
+	if ((fd = open ("/dev/uart6", O_RS485, mode)) < 0)
+	 {
+	 	// handle error
+	 } 
+```
+
+* The STM32F7xx hardware has its built-in handling of the DE pin (driver enable); they are    mapped to the RTS pin. The initialization of the DE pin must be done externally, and if you use CubeMX it will be done automatically for you if you select the correct UART options (RS-485 mode).
+
+In the example above, the `mode` parameter is a composite of the following variables:
+
+* Driver Enable Assertion Time: the least significant 8 bits (bits 0-7)
+* Driver Enable Deassertion Time: the next 8 bits (bits 8-15)
+* Driver Enable Polarity: the most significant bit (bit 31)
+
+The first two values are expressed in number of sample time units (1/8 or 1/16 bit time, depending on the oversampling rate); they can be between 0 and 31. For more details consult the STM32F7xx family reference manual. The Driver Enable Polarity will be 1 if the RS485_POLARITY is added to the `mode` argument.
+
+The VMIN and VTIM control characters are properly interpreted; in addition, because in embedded systems applications much shorter delays than 0.1 seconds are often reguired, we use a second control caracter mapped onto "spare 2" to reach a finer grain timeout for VTIM. This control character can be refered as `c_cc[VTIM + 2]` and can take values from 0 to 99 ms. The final timeout will be computed as `c_cc[VTIM] * 100 + c_cc[VTIM + 2]`.
 
 ## Version
-* 0.6 (26 July 2017)
+* 0.7 (30 July 2017)
 
 ## License
 * MIT
