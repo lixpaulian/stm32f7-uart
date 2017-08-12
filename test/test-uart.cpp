@@ -39,6 +39,7 @@
 #include "uart-drv.h"
 #include "io.h"
 
+
 extern "C"
 {
   UART_HandleTypeDef huart6;
@@ -57,11 +58,9 @@ os::posix::file_descriptors_manager descriptors_manager
 #define TEST_ROUNDS 10
 #define WRITE_READ_ROUNDS 10
 
-uint8_t tx_buffer[TX_BUFFER_SIZE];
-uint8_t rx_buffer[RX_BUFFER_SIZE];
 
 static ssize_t
-targeted_read (int filedes, char *buffer, size_t expected_size);
+targeted_read (os::posix::io* filedes, char *buffer, size_t expected_size);
 
 driver::uart uart6
   { "uart6", &huart6, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE };
@@ -108,7 +107,7 @@ HAL_UART_ErrorCallback (UART_HandleTypeDef *huart)
 void
 test_uart (void)
 {
-  int fd, count;
+  int count;
   char text[] =
     { "The quick brown fox jumps over the lazy dog 1234567890\r\n" };
   char text_end[] =
@@ -129,8 +128,10 @@ test_uart (void)
 
   for (int i = 0; i < TEST_ROUNDS; i++)
     {
+      os::posix::io* fd;
+
       // open the serial device
-      if ((fd = open ("/dev/uart6", 0)) < 0)
+      if ((fd = os::posix::open ("/dev/uart6", 0)) == nullptr)
         {
           trace::printf ("Error at open\n");
         }
@@ -161,7 +162,7 @@ test_uart (void)
           for (int j = 0; j < WRITE_READ_ROUNDS; j++)
             {
               // send text
-              if ((count = write (fd, text, strlen (text))) < 0)
+              if ((count = fd->write (text, strlen (text))) < 0)
                 {
                   trace::printf ("Error at write (%d)\n", j);
                   break;
@@ -181,7 +182,7 @@ test_uart (void)
             }
 
           // send separating dashes
-          if ((count = write (fd, text_end, strlen (text_end))) < 0)
+          if ((count = fd->write (text_end, strlen (text_end))) < 0)
             {
               trace::printf ("Error at write end text\n");
               break;
@@ -200,7 +201,7 @@ test_uart (void)
             }
 
           // close the serial device
-          if ((close (fd)) < 0)
+          if (fd->close () < 0)
             {
               trace::printf ("Error at close\n");
               break;
@@ -217,13 +218,13 @@ test_uart (void)
  * @return The number of characters read or an error if negative.
  */
 static ssize_t
-targeted_read (int fd, char *buffer, size_t expected_size)
+targeted_read (os::posix::io* fd, char *buffer, size_t expected_size)
 {
   int count, total = 0;
 
   do
     {
-      if ((count = read (fd, buffer + total, expected_size - total)) < 0)
+      if ((count = fd->read (buffer + total, expected_size - total)) < 0)
         {
           break;
         }
