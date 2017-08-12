@@ -41,8 +41,11 @@
 #if defined (__cplusplus)
 
 
-__attribute__((weak)) int send_break (UART_HandleTypeDef* huart, int duration);
+__attribute__((weak)) int
+send_break (UART_HandleTypeDef* huart, int duration);
 
+__attribute__((weak)) void
+switch_rs485_driver (UART_HandleTypeDef* huart, bool state);
 
 namespace os
 {
@@ -119,7 +122,7 @@ namespace os
 
 
       static constexpr uint8_t UART_DRV_VERSION_MAJOR = 0;
-      static constexpr uint8_t UART_DRV_VERSION_MINOR = 7;
+      static constexpr uint8_t UART_DRV_VERSION_MINOR = 8;
 
       UART_HandleTypeDef* huart_;
       uint8_t* tx_buff_;

@@ -35,13 +35,34 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
-// this function may be replaced in case the default break supplied by the HAL
-// library is insufficient; otherwise, a user supplied function must be provided.
+// This function can be replaced in case the default break supplied by the HAL
+// library is insufficient; if this is the case, a user supplied function must
+// be provided. The parameter "duration" is in milliseconds.
+// Do not edit this function, rather create your own with the same name
+// elsewhere in your project!
 __attribute__((weak)) int
 send_break (UART_HandleTypeDef* huart, int duration)
 {
+  switch_rs485_driver (huart, true);
   __HAL_UART_SEND_REQ(huart, UART_SENDBREAK_REQUEST);
+  while (__HAL_UART_GET_FLAG(huart, UART_FLAG_SBKF))
+    ;
+  switch_rs485_driver (huart, false);
   return 0;
+}
+
+// This function can be replaced in case the STM32Fxx's hardware controlled
+// RS-485 Driver Enable (DE) pin is not used, rather a different one. Create
+// your own function that switches the pin depending on the state parameter
+// elsewhere in your project. The UART driver expects that if state == true,
+// the RS-485 driver is enabled. Obviously, the pin must have been initialized
+// as output before; an ideal place for this is in the HAL_UART_Init function.
+// If CubeMX is used, this can be done by adding user code in the user sections
+// of the HAL_UART_MspInit and HAL_UART_MspDeInit functions.
+__attribute__((weak)) void
+switch_rs485_driver (UART_HandleTypeDef* huart, bool state)
+{
+  ;
 }
 
 namespace os
@@ -308,6 +329,9 @@ namespace os
       tx_sem_.wait ();
       memcpy (tx_buff_, buf, count = std::min (tx_buff_size_, nbyte));
 
+      // switch on the rs-485 driver enable signal
+      switch_rs485_driver (huart_, true);
+
       // send the buffer, as much as we can
       if (huart_->hdmatx == nullptr)
         {
@@ -509,6 +533,9 @@ namespace os
     uart::cb_tx_event (void)
     {
       tx_sem_.post ();
+
+      // switch off the rs-485 driver enable signal
+      switch_rs485_driver (huart_, false);
     }
 
     /**
