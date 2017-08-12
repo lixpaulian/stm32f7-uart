@@ -38,8 +38,15 @@ In the example above, the `mode` parameter is a composite of the following varia
 
 The first two values are expressed in number of sample time units (1/8 or 1/16 bit time, depending on the oversampling rate); they can be between 0 and 31. The Driver Enable Polarity will be 1 if the RS485_POLARITY is added to the `mode` argument. For more details consult the STM32F7xx family reference manual.
 
+If the DE pin used is not the one defined by the STM32F7xx hardware, a function can be defined in your project to enable the RS-485 driver. The function has the prototype
+```c
+void
+switch_rs485_driver (UART_HandleTypeDef* huart, bool state);
+```
+This function should perform the Driver Enable functionality. Of course, the hardware must be initialised accordingly.
+
 ## Version
-* 0.7 (30 July 2017)
+* 0.8 (12 August 2017)
 
 ## License
 * MIT
