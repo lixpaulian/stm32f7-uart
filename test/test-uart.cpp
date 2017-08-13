@@ -38,7 +38,10 @@
 
 #include "uart-drv.h"
 #include "io.h"
+#include "sysconfig.h"
 
+
+#if (UART_TEST == true || CONSOLE_ON_UART6 == true)
 
 extern "C"
 {
@@ -234,3 +237,5 @@ targeted_read (os::posix::io* fd, char *buffer, size_t expected_size)
 
   return total;
 }
+
+#endif
