@@ -3,7 +3,6 @@ This is a µOS++ UART driver for the STM32F7xx family of controllers.
 
 The driver is functional, but several features are still missing (and the list is probably incomplete):
 * Further implementation of serial port control through `struct termios` related functions (`tcgetattr` and `tcsetattr`) and `fcntl`
-* Software handshaking protocol (XON/XOFF)
 * DCD signal handling (and perhaps modem signals handling too?)
 * The `fcntl` call
 
@@ -36,17 +35,12 @@ In the example above, the `mode` parameter is a composite of the following varia
 * Driver Enable Deassertion Time: the next 8 bits (bits 8-15)
 * Driver Enable Polarity: the most significant bit (bit 31)
 
-The first two values are expressed in number of sample time units (1/8 or 1/16 bit time, depending on the oversampling rate); they can be between 0 and 31. The Driver Enable Polarity will be 1 if the RS485_POLARITY is added to the `mode` argument. For more details consult the STM32F7xx family reference manual.
+The first two values are expressed in number of sample time units (1/8 or 1/16 bit time, depending on the oversampling rate); they can be between 0 and 31. The Driver Enable Polarity will be 1 if the RS485_POLARITY is added to the `mode` argument. For more details consult the STM32F7xx family Reference Manual.
 
-If the DE pin used is not the one defined by the STM32F7xx hardware, a function can be defined in your project to enable the RS-485 driver. The function has the prototype
-```c
-void
-switch_rs485_driver (UART_HandleTypeDef* huart, bool state);
-```
-This function should perform the Driver Enable functionality. Of course, the hardware must be initialised accordingly.
+If the DE pin used is not the one defined by the STM32F7xx hardware, you can derive your own uart class and replace the function `void uart::do_rs485_de (bool state)`. The same applies for sending breaks: you may want to replace the function `int uart::do_tcsendbreak (int duration)` with your own. The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, with the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored.
 
 ## Version
-* 0.8 (12 August 2017)
+* 0.9 (16 August 2017)
 
 ## License
 * MIT
