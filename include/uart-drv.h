@@ -40,13 +40,6 @@
 
 #if defined (__cplusplus)
 
-
-__attribute__((weak)) int
-send_break (UART_HandleTypeDef* huart, int duration);
-
-__attribute__((weak)) void
-switch_rs485_driver (UART_HandleTypeDef* huart, bool state);
-
 namespace os
 {
   namespace driver
@@ -85,13 +78,13 @@ namespace os
       get_version (uint8_t& version_major, uint8_t& version_minor);
 
       int
-      do_tcgetattr (struct termios *ptio);
+      tcgetattr (struct termios *ptio);
 
       int
-      do_tcsetattr (int options, const struct termios *ptio);
+      tcsetattr (int options, const struct termios *ptio);
 
       int
-      do_tcsendbreak (int duration);
+      tcsendbreak (int duration);
 
       // --------------------------------------------------------------------
 
@@ -115,11 +108,21 @@ namespace os
       bool
       do_is_connected (void) override;
 
+      int
+      do_tcgetattr (struct termios *ptio);
+
+      int
+      do_tcsetattr (int options, const struct termios *ptio);
+
+      virtual int
+      do_tcsendbreak (int duration);
+
+      virtual void
+      do_rs485_de (bool state);
+
       // --------------------------------------------------------------------
 
     private:
-
-
 
       static constexpr uint8_t UART_DRV_VERSION_MAJOR = 0;
       static constexpr uint8_t UART_DRV_VERSION_MINOR = 8;
@@ -167,9 +170,36 @@ namespace os
     }
 
     inline int
-    uart::do_tcsendbreak (int duration)
+    uart::tcsendbreak (int duration)
     {
-      return send_break (huart_, duration);
+      return do_tcsendbreak (duration);
+    }
+
+    inline int
+    uart::tcgetattr (struct termios *ptio)
+    {
+      return do_tcgetattr (ptio);
+    }
+
+    inline int
+    uart::tcsetattr (int options, const struct termios *ptio)
+    {
+      return do_tcsetattr (options, ptio);
+    }
+
+    inline int
+    uart::do_tcsendbreak (int duration __attribute__ ((unused)))
+    {
+      __HAL_UART_SEND_REQ(huart_, UART_SENDBREAK_REQUEST);
+      while (__HAL_UART_GET_FLAG(huart_, UART_FLAG_SBKF))
+        ;
+      return 0;
+    }
+
+    inline void
+    uart::do_rs485_de (bool state __attribute__ ((unused)))
+    {
+      // do nothing, as the rs485 driver is enabled by the hardware.
     }
 
   } /* namespace driver */
