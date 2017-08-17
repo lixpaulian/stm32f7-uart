@@ -80,6 +80,9 @@
 #define	VSTATUS		18	/* ICANON together with IEXTEN */
 /*			19	   spare 2 */
 #endif
+/* Added 2017/08/18 (LNP) */
+#define VTIME_MS        19      /* !ICANON */
+/* End added */
 #define	NCCS		20
 
 #define	_POSIX_VDISABLE	0xff
