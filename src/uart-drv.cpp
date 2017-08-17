@@ -247,38 +247,54 @@ namespace os
       return 0;
     }
 
+    // Note: the inter-character timeout doesn't work when DMA is used on receive,
+    // in this case the timeout applies for a received block.
+    // In other words, while the DMA may still transfer characters, the function
+    // will still return with timeout until. Only an idle interrupt determines
+    // a successful exit.
+    // This refers to the rules defined by the POSIX c_cc[VTIME] and c_cc[VMIN]
+    // of struct termios.
+
     ssize_t
     uart::do_read (void* buf, std::size_t nbyte)
     {
       uint8_t* lbuf = (uint8_t *) buf;
       ssize_t count = 0;
-      os::rtos::clock::duration_t timeout;
+      os::rtos::clock::duration_t timeout =
+          o_nonblock_ ? 0 : (cc_vmin_ > 0) ? 0xFFFFFFFF : rx_timeout_;
+      uint16_t last_count = huart_->RxXferCount;
 
       do
         {
-          if (rx_out_ == rx_in_)
+          while (rx_out_ == rx_in_)
             {
               if (is_error_ == true)
                 {
                   is_error_ = false;
                   errno = EIO;
-                  count = -1;
-                  break;  // an error was reported, exit
+                  return -1;  // an error was reported, exit
                 }
 
-              // determine the timeout value
-              timeout = o_nonblock_ ? 0 :
-                        (cc_vmin_ > count) ? 0xFFFFFFFF : rx_timeout_;
               if (rx_sem_.timed_wait (timeout) != os::rtos::result::ok)
                 {
-                  break;  // timeout, return number of chars collected, if any
+                  if (last_count == huart_->RxXferCount)
+                    {
+                      // inter-char timeout, return number of chars collected, if any
+                      break;
+                    }
+                  last_count = huart_->RxXferCount;
                 }
             }
 
+          // get accumulated chars
           while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
             {
               *lbuf++ = rx_buff_[rx_out_++];
-              count++;
+              if (++count == 1)
+                {
+                  // VMIN > 0, apply timeout (can be infinitum too)
+                  timeout = rx_timeout_;
+                }
               if (rx_out_ >= rx_buff_size_)
                 {
                   rx_out_ = 0;
@@ -395,7 +411,7 @@ namespace os
       ptio->c_cc[VMIN] = cc_vmin_;
       ptio->c_cc[VTIME] = cc_vtime_;
       // we use the "spare 2" character for a fine grained delay (1 ms)
-      ptio->c_cc[VTIME + 2] = cc_vtime_milli_;
+      ptio->c_cc[VTIME_MS] = cc_vtime_milli_;
 
       return 0;
     }
@@ -449,7 +465,7 @@ namespace os
       cc_vtime_ = ptio->c_cc[VTIME];
       // we expect in the "spare 2" character the fine grained delay (1 ms)
       cc_vtime_milli_ =
-          (ptio->c_cc[VTIME + 2] > 99) ? 0 : ptio->c_cc[VTIME + 2];
+          (ptio->c_cc[VTIME_MS] > 99) ? 99 : ptio->c_cc[VTIME_MS];
 
       // compute rx timeout
       if (o_nonblock_)
@@ -458,7 +474,7 @@ namespace os
         }
       else
         {
-          if (cc_vtime_ == 0)
+          if (cc_vtime_ == 0 && cc_vtime_milli_ == 0)
             {
               rx_timeout_ = 0xFFFFFFFF;
             }
@@ -582,6 +598,5 @@ namespace os
 
   } /* namespace driver */
 } /* namespace os */
-
 
 #pragma GCC diagnostic pop
