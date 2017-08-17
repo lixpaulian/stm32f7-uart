@@ -2,7 +2,7 @@
 This is a µOS++ UART driver for the STM32F7xx family of controllers.
 
 The driver is functional, but several features are still missing (and the list is probably incomplete):
-* Further implementation of serial port control through `struct termios` related functions (`tcgetattr` and `tcsetattr`) and `fcntl`
+* Further implementation of serial port control through `struct termios` (although the most useful flags have been implemented)
 * DCD signal handling (and perhaps modem signals handling too?)
 * The `fcntl` call
 
@@ -10,7 +10,7 @@ The POSIX approach to configure a serial port is through the `struct termios` an
 
 The current implementation supports CTS/RTS hardware handshaking and can be enabled/disabled over the standard `termios` structure. This functionality is implemented by the HAL and the STM32F7xx hardware.
 
-The `termios` VMIN and VTIM control characters are properly interpreted; in addition, because in embedded applications much shorter delays than 0.1 seconds are often required, we use a second control caracter (mapped onto "spare 2") to reach a finer grain timeout for VTIM. This control character can be refered as `c_cc[VTIM + 2]` and can take values from 0 to 99 ms. The final timeout will be computed as `c_cc[VTIM] * 100 + c_cc[VTIM + 2]`.
+The `termios` VMIN and VTIM control characters are properly interpreted; in addition, because in embedded applications much shorter delays than 0.1 seconds are often required, we use a second control caracter (mapped onto "spare 2") to reach a finer grain timeout for VTIM. This control character can be refered as `c_cc[VTIM_MS]`, or `c_cc[VTIM + 2]` and can take values from 0 to 99 ms. The final timeout will be computed as `c_cc[VTIM] * 100 + c_cc[VTIM_MS]`. Note however, that when the driver is operated in DMA mode, the POSIX description of the relationship between VTIM and VMIN does not fully apply: the inter-character timeout is not  observed, rather the timeout until the first idle character.
 
 The driver supports RS-485 half-duplex operation. There are two aspects to consider:
 
@@ -40,7 +40,7 @@ The first two values are expressed in number of sample time units (1/8 or 1/16 b
 If the DE pin used is not the one defined by the STM32F7xx hardware, you can derive your own uart class and replace the function `void uart::do_rs485_de (bool state)`. The same applies for sending breaks: you may want to replace the function `int uart::do_tcsendbreak (int duration)` with your own. The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, with the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored.
 
 ## Version
-* 0.9 (16 August 2017)
+* 1.0 (18 August 2017)
 
 ## License
 * MIT
@@ -75,7 +75,7 @@ If data comes in bursts, each idle character determines an interupt and the data
 
 A similar approach is used for the interrupt based receive, with a simulated "half-complete" transfer implemented in software by dividing the internal buffer in two equal parts.
 
-Because the UART HAL library does not handle interrupt on idle, this must be added manually if you generate your files with CubeMX, as shown below (look in the generated file `stm32f7xx_it.c`):
+Because the UART HAL library does not handle interrupt on idle, this must be added manually if you generate your files with CubeMX, as shown below (in the generated file `stm32f7xx_it.c`):
 
 ```c
 /**
