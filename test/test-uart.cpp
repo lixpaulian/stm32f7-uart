@@ -142,7 +142,7 @@ test_uart (void)
         {
           // get serial port parameters
           struct termios tios;
-          if (uart6.tcgetattr (&tios) < 0)
+          if (static_cast<driver::uart*> (fd)->tcgetattr (&tios) < 0)
             {
               trace::printf ("Error getting serial port parameters\n");
             }
