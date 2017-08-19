@@ -8,9 +8,11 @@ The driver is functional, but several features are still missing (and the list i
 
 The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu plans to support `termios` and friends in an upcoming version of the µOS++. Until then the `termios.h` and `fcntl.h` header files have been included with the driver. The lack of newlib support means that you cannot call `tcgetattr` and `tcsetattr` library functions. However, you can still access these functions directly from the driver (see the test example).
 
-The current implementation supports CTS/RTS hardware handshaking and can be enabled/disabled over the standard `termios` structure. This functionality is implemented by the HAL and the STM32F7xx hardware.
+The STM32Fxx family UARTs support only 7 and 8 bits characters, with or without parity. On the other hand, `termios` defines 5, 6, 7 and 8 bit characters, i.e. as CS5, CS6, CS7 and CS8, thus the driver supports only CS7 and CS8 modes.
 
-The `termios` VMIN and VTIM control characters are properly interpreted; in addition, because in embedded applications much shorter delays than 0.1 seconds are often required, we use a second control caracter (mapped onto "spare 2") to reach a finer grain timeout for VTIM. This control character can be refered as `c_cc[VTIM_MS]`, or `c_cc[VTIM + 2]` and can take values from 0 to 99 ms. The final timeout will be computed as `c_cc[VTIM] * 100 + c_cc[VTIM_MS]`. Note however, that when the driver is operated in DMA mode, the POSIX description of the relationship between VTIM and VMIN does not fully apply: the inter-character timeout is not  observed, rather the timeout until the first idle character.
+The current implementation supports CTS/RTS hardware handshaking and can be enabled/disabled over the `termios` structure. This functionality is implemented by the HAL and the STM32F7xx hardware.
+
+The `termios` VMIN and VTIM control characters are properly interpreted; in addition, because in embedded applications much shorter delays than 0.1 seconds are often required, we use a second control caracter (mapped onto "spare 2") to reach a finer grain timeout for VTIM. This control character can be refered as `c_cc[VTIM_MS]`, or `c_cc[VTIM + 2]` and can take values from 0 to 99 ms. The final timeout will be computed as `c_cc[VTIM] * 100 + c_cc[VTIM_MS]`. 
 
 The driver supports RS-485 half-duplex operation. There are two aspects to consider:
 
@@ -37,10 +39,10 @@ In the example above, the `mode` parameter is a composite of the following varia
 
 The first two values are expressed in number of sample time units (1/8 or 1/16 bit time, depending on the oversampling rate); they can be between 0 and 31. The Driver Enable Polarity will be 1 if the RS485_POLARITY is added to the `mode` argument. For more details consult the STM32F7xx family Reference Manual.
 
-If the DE pin used is not the one defined by the STM32F7xx hardware, you can derive your own uart class and replace the function `void uart::do_rs485_de (bool state)`. The same applies for sending breaks: you may want to replace the function `int uart::do_tcsendbreak (int duration)` with your own. The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, with the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored.
+If the DE pin used is not the one defined by the STM32F7xx hardware, you can derive your own uart class and replace the function `void uart::do_rs485_de (bool state)`. The same applies for sending breaks: you may want to replace the function `int uart::do_tcsendbreak (int duration)` with your own. The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, in the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored, whereas a custom implementation may/should use it. Such a custom function would probably reconfigure the UART's TxD pin as output port, then switch it low, wait for the specified amount of time in a uOS++ delay function, switch the port high and finally reconfigure the pin as TxD.
 
 ## Version
-* 1.0 (18 August 2017)
+* 1.10 (20 August 2017)
 
 ## License
 * MIT
@@ -66,7 +68,7 @@ The driver can perform data transfers DMA based, or interrupt based. The selecti
 The driver's API is conceived in a way to be easily integrated in a POSIX environment. It is derived from the `device_char` class found in µOS++.
 
 ### Transmit
-The driver expects a buffer and a count to be sent. In both DMA and interrupt modes, it initializes the UART and DMA (if in DMA mode) and waits for the transfer to be finshed. During this time, a semaphore blocks the caller to try to send more data, until the ongoing transfer is finished. An internal buffer is used for temporary storage until the data is sent.
+The driver expects a buffer and a count of bytes to be sent. In both DMA and interrupt modes, it initializes the UART and DMA (if in DMA mode) and waits for the transfer to be finshed. During this time, a semaphore blocks the caller to try to send more data, until the ongoing transfer is finished. An internal buffer is used for temporary storage until the data is sent.
 
 ### Receive
 Using DMA to receive is a bit tricky, because generally you don't know how much data you are going to get so that you know how to program the DMA's counter. The solution is to use the "interrupt on idle" property (most UARTs "know" this). What is an "idle character"? This is defined as the period of time equal to a character at the given baud rate, during which time the line is in spacing state (that is, at the stop bit's level).
