@@ -84,6 +84,9 @@ namespace os
       tcsetattr (int options, const struct termios *ptio);
 
       int
+      tcflush (int queue_selector);
+
+      int
       tcsendbreak (int duration);
 
       // --------------------------------------------------------------------
@@ -113,6 +116,9 @@ namespace os
 
       int
       do_tcsetattr (int options, const struct termios *ptio);
+
+      int
+      do_tcflush (int queue_selector);
 
       virtual int
       do_tcsendbreak (int duration);
@@ -185,6 +191,12 @@ namespace os
     uart::tcsetattr (int options, const struct termios *ptio)
     {
       return do_tcsetattr (options, ptio);
+    }
+
+    inline int
+    uart::tcflush (int queue_selector)
+    {
+      return do_tcflush (queue_selector);
     }
 
     inline int

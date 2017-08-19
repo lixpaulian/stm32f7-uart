@@ -32,6 +32,10 @@
 
 #include "uart-drv.h"
 
+// Set this switch to true if your UART(s) is (are) fully initialized by
+// the start-up routines. Note: the UART handle MUST be initialized in any case!
+#define UART_INITED_BY_CUBE_MX false
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
@@ -57,12 +61,14 @@ namespace os
     {
       trace::printf ("%s() %p\n", __func__, this);
 
+#if UART_INITED_BY_CUBE_MX == true
       // de-initialize the UART, as we assume it was automatically initialized
       // by the CubeMX generated code in the CubeMX's main () function.
       if (huart->Instance != nullptr)
         {
           HAL_UART_DeInit (huart);
         }
+#endif
 
       // if not using DMA, the rx_buff_size must be even
       rx_buff_size_ % 2 ? rx_buff_size_-- : rx_buff_size_;
@@ -87,6 +93,12 @@ namespace os
           if (is_opened_)
             {
               errno = EEXIST; // already opened
+              break;
+            }
+
+          if (huart_->Instance == nullptr)
+            {
+              errno = EIO;      // no UART defined
               break;
             }
 
@@ -247,22 +259,21 @@ namespace os
       return 0;
     }
 
-    // Note: the inter-character timeout doesn't work when DMA is used on receive,
-    // in this case the timeout applies for a received block.
-    // In other words, while the DMA may still transfer characters, the function
-    // will still return with timeout until. Only an idle interrupt determines
-    // a successful exit.
-    // This refers to the rules defined by the POSIX c_cc[VTIME] and c_cc[VMIN]
-    // of struct termios.
-
     ssize_t
     uart::do_read (void* buf, std::size_t nbyte)
     {
       uint8_t* lbuf = (uint8_t *) buf;
       ssize_t count = 0;
+
       os::rtos::clock::duration_t timeout =
           o_nonblock_ ? 0 : (cc_vmin_ > 0) ? 0xFFFFFFFF : rx_timeout_;
-      uint16_t last_count = huart_->RxXferCount;
+
+      uint32_t last_count =
+          huart_->hdmarx == nullptr ?
+              huart_->RxXferCount : huart_->hdmarx->Instance->NDTR;
+
+      // compute mask for possible parity bit masking
+      UART_MASK_COMPUTATION(huart_);
 
       do
         {
@@ -277,19 +288,25 @@ namespace os
 
               if (rx_sem_.timed_wait (timeout) != os::rtos::result::ok)
                 {
-                  if (last_count == huart_->RxXferCount)
+                  if (last_count
+                      == (huart_->hdmarx == nullptr ?
+                          huart_->RxXferCount : huart_->hdmarx->Instance->NDTR))
                     {
-                      // inter-char timeout, return number of chars collected, if any
+                      // no more chars received: that means inter-char timeout,
+                      // return number of chars collected, if any
                       break;
                     }
-                  last_count = huart_->RxXferCount;
+                  last_count =
+                      huart_->hdmarx == nullptr ?
+                          huart_->RxXferCount : huart_->hdmarx->Instance->NDTR;
                 }
             }
 
-          // get accumulated chars
+          // retrieve accumulated chars, if any
           while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
             {
-              *lbuf++ = rx_buff_[rx_out_++];
+              // we mask potential parity bit as HAL doesn't do it on DMA transfers
+              *lbuf++ = rx_buff_[rx_out_++] & huart_->Mask;
               if (++count == 1)
                 {
                   // VMIN > 0, apply timeout (can be infinitum too)
@@ -376,7 +393,7 @@ namespace os
       bzero ((void *) ptio, sizeof(struct termios));
 
       // termios.h: CSIZE: CS5, CS6, CS7, CS8; ST can CS7 and CS8 only
-      // note: ST uses a standard bit for parity, must be subtracted from total
+      // note: ST uses a normal bit for parity, must be subtracted from total
       if (huart_->Init.Parity == UART_PARITY_NONE)
         {
           ptio->c_cflag =
@@ -408,9 +425,9 @@ namespace os
           huart_->Init.HwFlowCtl == UART_HWCONTROL_CTS ? CCTS_OFLOW : 0;
 
       // termios.h: retrieve supported control characters (c_cc[])
+      // we use the "spare 2" character for a fine grained delay (1 ms)
       ptio->c_cc[VMIN] = cc_vmin_;
       ptio->c_cc[VTIME] = cc_vtime_;
-      // we use the "spare 2" character for a fine grained delay (1 ms)
       ptio->c_cc[VTIME_MS] = cc_vtime_milli_;
 
       return 0;
@@ -421,8 +438,8 @@ namespace os
     {
       HAL_StatusTypeDef result;
 
-      // ST UARTS support only 7 and 8 bit chars
-      if ((ptio->c_cflag & CSIZE) < CS7)
+      // ST UARTs support only CS7 and CS8
+      if ((ptio->c_cflag & CSIZE) < CS7 || options > TCIOFLUSH)
         {
           errno = EINVAL;
           return -1;
@@ -464,8 +481,7 @@ namespace os
       cc_vmin_ = ptio->c_cc[VMIN];
       cc_vtime_ = ptio->c_cc[VTIME];
       // we expect in the "spare 2" character the fine grained delay (1 ms)
-      cc_vtime_milli_ =
-          (ptio->c_cc[VTIME_MS] > 99) ? 99 : ptio->c_cc[VTIME_MS];
+      cc_vtime_milli_ = (ptio->c_cc[VTIME_MS] > 99) ? 99 : ptio->c_cc[VTIME_MS];
 
       // compute rx timeout
       if (o_nonblock_)
@@ -485,7 +501,21 @@ namespace os
             }
         }
 
-      // TODO: handle more options
+      // evaluate the options
+      switch (options)
+        {
+        case TCSAFLUSH:
+          // flush input
+          do_tcflush (TCIFLUSH);
+          // no break, falls through
+
+        case TCSADRAIN:
+          // wait for output to be drained
+          while (huart_->gState == HAL_UART_STATE_BUSY_TX)
+            {
+              tx_sem_.wait ();
+            }
+        }
 
       // before sending the new configuration, stop the UART
       __HAL_UART_DISABLE(huart_);
@@ -510,6 +540,58 @@ namespace os
         }
 
       return 0;
+    }
+
+    int
+    uart::do_tcflush (int queue_selector)
+    {
+      HAL_StatusTypeDef hal_result;
+      int result = 0;
+
+      if (queue_selector > TCIOFLUSH)
+        {
+          errno = EINVAL;
+          result = -1;
+        }
+      else
+        {
+          if (huart_->hdmarx != nullptr || huart_->hdmatx != nullptr)
+            {
+              HAL_UART_DMAStop (huart_);
+            }
+
+          if (queue_selector & TCIFLUSH)
+            {
+              huart_->RxState = HAL_UART_STATE_READY;
+              rx_sem_.reset ();
+              rx_in_ = rx_out_ = 0;
+            }
+
+          if (queue_selector & TCOFLUSH)
+            {
+              tx_sem_.reset ();
+              tx_in_ = tx_out_ = 0;
+              do_rs485_de (false);
+            }
+
+          // restart receive
+          if (huart_->hdmarx == nullptr)
+            {
+              hal_result = HAL_UART_Receive_IT (huart_, rx_buff_,
+                                                rx_buff_size_ / 2);
+            }
+          else
+            {
+              hal_result = HAL_UART_Receive_DMA (huart_, rx_buff_,
+                                                 rx_buff_size_);
+            }
+          if (hal_result != HAL_OK)
+            {
+              errno = EIO;
+              result = -1;
+            }
+        }
+      return result;
     }
 
     /**
