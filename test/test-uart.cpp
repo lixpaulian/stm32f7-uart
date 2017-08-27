@@ -63,7 +63,7 @@ os::posix::file_descriptors_manager descriptors_manager
 
 
 static ssize_t
-targeted_read (os::posix::io* filedes, char *buffer, size_t expected_size);
+targeted_read (os::posix::tty* filedes, char *buffer, size_t expected_size);
 
 driver::uart uart6
   { "uart6", &huart6, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE };
@@ -131,10 +131,11 @@ test_uart (void)
 
   for (int i = 0; i < TEST_ROUNDS; i++)
     {
-      os::posix::io* fd;
+      os::posix::tty* tty;
 
       // open the serial device
-      if ((fd = os::posix::open ("/dev/uart6", 0)) == nullptr)
+      tty = static_cast<os::posix::tty*> (os::posix::open ("/dev/uart6", 0));
+      if (tty == nullptr)
         {
           trace::printf ("Error at open\n");
         }
@@ -142,7 +143,7 @@ test_uart (void)
         {
           // get serial port parameters
           struct termios tios;
-          if (static_cast<driver::uart*> (fd)->tcgetattr (&tios) < 0)
+          if (tty->tcgetattr (&tios) < 0)
             {
               trace::printf ("Error getting serial port parameters\n");
             }
@@ -165,14 +166,14 @@ test_uart (void)
           for (int j = 0; j < WRITE_READ_ROUNDS; j++)
             {
               // send text
-              if ((count = fd->write (text, strlen (text))) < 0)
+              if ((count = tty->write (text, strlen (text))) < 0)
                 {
                   trace::printf ("Error at write (%d)\n", j);
                   break;
                 }
 
               // read text
-              count = targeted_read (fd, buffer, strlen (text));
+              count = targeted_read (tty, buffer, strlen (text));
               if (count > 0)
                 {
                   buffer[count] = '\0';
@@ -185,14 +186,14 @@ test_uart (void)
             }
 
           // send separating dashes
-          if ((count = fd->write (text_end, strlen (text_end))) < 0)
+          if ((count = tty->write (text_end, strlen (text_end))) < 0)
             {
               trace::printf ("Error at write end text\n");
               break;
             }
 
           // read separating dashes
-          count = targeted_read (fd, buffer, strlen (text_end));
+          count = targeted_read (tty, buffer, strlen (text_end));
           if (count > 0)
             {
               buffer[count] = '\0';
@@ -204,7 +205,7 @@ test_uart (void)
             }
 
           // close the serial device
-          if (fd->close () < 0)
+          if (tty->close () < 0)
             {
               trace::printf ("Error at close\n");
               break;
@@ -221,13 +222,13 @@ test_uart (void)
  * @return The number of characters read or an error if negative.
  */
 static ssize_t
-targeted_read (os::posix::io* fd, char *buffer, size_t expected_size)
+targeted_read (os::posix::tty* tty, char *buffer, size_t expected_size)
 {
   int count, total = 0;
 
   do
     {
-      if ((count = fd->read (buffer + total, expected_size - total)) < 0)
+      if ((count = tty->read (buffer + total, expected_size - total)) < 0)
         {
           break;
         }
