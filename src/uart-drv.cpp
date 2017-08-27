@@ -33,8 +33,10 @@
 #include "uart-drv.h"
 
 // Set this switch to true if your UART(s) is (are) fully initialized by
-// the start-up routines. Note: the UART handle MUST be initialized in any case!
+// the start-up routines. Note: the UART handle MUST have been initialized!
+#ifndef UART_INITED_BY_CUBE_MX
 #define UART_INITED_BY_CUBE_MX false
+#endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -46,7 +48,16 @@ namespace os
 
     uart::uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
                 uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size) : //
-        device_char
+        uart
+          { name, huart, tx_buff, rx_buff, tx_buff_size, rx_buff_size, false, 0 } //
+    {
+      ;
+    }
+
+    uart::uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
+                uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size,
+                bool is_rs485, uint32_t rs485_de_params) : //
+        tty
           { name }, //
         huart_
           { huart }, //
@@ -57,7 +68,11 @@ namespace os
         tx_buff_size_
           { tx_buff_size }, //
         rx_buff_size_
-          { rx_buff_size }
+          { rx_buff_size }, //
+        is_rs485_
+          { is_rs485 }, //
+        rs485_de_params_
+          { rs485_de_params }
     {
       trace::printf ("%s() %p\n", __func__, this);
 
@@ -103,15 +118,14 @@ namespace os
             }
 
           // initialize the UART
-          if (oflag & O_RS485)
+          if (is_rs485_)
             {
-              uint32_t rs485_setting = va_arg(args, uint32_t);
-
               if ((hal_result = HAL_RS485Ex_Init (huart_, //
-                  rs485_setting & RS485_POLARITY ? //
+                  rs485_de_params_ & RS485_DE_POLARITY_MASK ? //
                   UART_DE_POLARITY_HIGH :
                   UART_DE_POLARITY_LOW, //
-                  rs485_setting & 0xFF, (rs485_setting & 0xFF) >> 8)) != HAL_OK)
+                  rs485_de_params_ & 0xFF, (rs485_de_params_ & 0xFF) >> 8))
+                  != HAL_OK)
                 {
                   break;
                 }
@@ -592,6 +606,21 @@ namespace os
             }
         }
       return result;
+    }
+
+    int
+    uart::do_tcsendbreak (int duration)
+    {
+      __HAL_UART_SEND_REQ(huart_, UART_SENDBREAK_REQUEST);
+      while (__HAL_UART_GET_FLAG(huart_, UART_FLAG_SBKF))
+        ;
+      return 0;
+    }
+
+    void
+    uart::do_rs485_de (bool state)
+    {
+      // do nothing, as the rs485 driver is normally enabled by the hardware.
     }
 
     /**

@@ -30,13 +30,13 @@
 #ifndef INCLUDE_UART_DRV_H_
 #define INCLUDE_UART_DRV_H_
 
-#include <termios.h>
+#include <cmsis-plus/rtos/os.h>
+#include <cmsis-plus/posix-io/tty.h>
+#include <cmsis-plus/posix/termios.h>
 #include <fcntl.h>
+
 #include "cmsis_device.h"
 #include "stm32f7xx_hal_usart.h"
-
-#include <cmsis-plus/rtos/os.h>
-#include <cmsis-plus/posix-io/device-char.h>
 
 #if defined (__cplusplus)
 
@@ -45,14 +45,21 @@ namespace os
   namespace driver
   {
 
-    class uart : public os::posix::device_char
+    class uart : public os::posix::tty
     {
     public:
 
       // --------------------------------------------------------------------
 
+      // driver enable polarity
+      static constexpr uint32_t RS485_DE_POLARITY_MASK = 0x80000000;
+
       uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
             uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
+
+      uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
+            uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size,
+            bool is_rs485, uint32_t rs485_de_params);
 
       uart (const uart&) = delete;
 
@@ -67,6 +74,9 @@ namespace os
       virtual
       ~uart () noexcept;
 
+      void
+      get_version (uint8_t& version_major, uint8_t& version_minor);
+
       // driver specific, not inherited functions
       void
       cb_tx_event (void);
@@ -74,54 +84,12 @@ namespace os
       void
       cb_rx_event (bool half);
 
-      void
-      get_version (uint8_t& version_major, uint8_t& version_minor);
-
-      int
-      tcgetattr (struct termios *ptio);
-
-      int
-      tcsetattr (int options, const struct termios *ptio);
-
-      int
-      tcflush (int queue_selector);
-
-      int
-      tcsendbreak (int duration);
-
       // --------------------------------------------------------------------
 
     protected:
 
-      int
-      do_vopen (const char* path, int oflag, std::va_list args) override;
-
-      int
-      do_close (void) override;
-
-      ssize_t
-      do_read (void* buf, std::size_t nbyte) override;
-
-      ssize_t
-      do_write (const void* buf, std::size_t nbyte) override;
-
-      bool
-      do_is_opened (void) override;
-
-      bool
-      do_is_connected (void) override;
-
-      int
-      do_tcgetattr (struct termios *ptio);
-
-      int
-      do_tcsetattr (int options, const struct termios *ptio);
-
-      int
-      do_tcflush (int queue_selector);
-
       virtual int
-      do_tcsendbreak (int duration);
+      do_tcsendbreak (int duration) override;
 
       virtual void
       do_rs485_de (bool state);
@@ -130,8 +98,35 @@ namespace os
 
     private:
 
+      virtual int
+      do_vopen (const char* path, int oflag, std::va_list args) override;
+
+      virtual int
+      do_close (void) override;
+
+      virtual ssize_t
+      do_read (void* buf, std::size_t nbyte) override;
+
+      virtual ssize_t
+      do_write (const void* buf, std::size_t nbyte) override;
+
+      virtual bool
+      do_is_opened (void) override;
+
+      virtual bool
+      do_is_connected (void) override;
+
+      virtual int
+      do_tcgetattr (struct termios *ptio) override;
+
+      virtual int
+      do_tcsetattr (int options, const struct termios *ptio) override;
+
+      virtual int
+      do_tcflush (int queue_selector) override;
+
       static constexpr uint8_t UART_DRV_VERSION_MAJOR = 1;
-      static constexpr uint8_t UART_DRV_VERSION_MINOR = 0;
+      static constexpr uint8_t UART_DRV_VERSION_MINOR = 20;
 
       UART_HandleTypeDef* huart_;
       uint8_t* tx_buff_;
@@ -150,6 +145,7 @@ namespace os
       bool volatile is_connected_ = false;
       bool volatile is_opened_ = false;
       bool volatile is_error_ = false;
+      bool volatile is_rs485_;
 
       bool volatile o_nonblock_ = false;
 
@@ -161,6 +157,11 @@ namespace os
         { "tx", 1 };
       os::rtos::semaphore_binary rx_sem_
         { "rx", 0 };
+
+    protected:
+
+      uint32_t rs485_de_params_;
+
     };
 
     /**
@@ -173,45 +174,6 @@ namespace os
     {
       version_major = UART_DRV_VERSION_MAJOR;
       version_minor = UART_DRV_VERSION_MINOR;
-    }
-
-    inline int
-    uart::tcsendbreak (int duration)
-    {
-      return do_tcsendbreak (duration);
-    }
-
-    inline int
-    uart::tcgetattr (struct termios *ptio)
-    {
-      return do_tcgetattr (ptio);
-    }
-
-    inline int
-    uart::tcsetattr (int options, const struct termios *ptio)
-    {
-      return do_tcsetattr (options, ptio);
-    }
-
-    inline int
-    uart::tcflush (int queue_selector)
-    {
-      return do_tcflush (queue_selector);
-    }
-
-    inline int
-    uart::do_tcsendbreak (int duration __attribute__ ((unused)))
-    {
-      __HAL_UART_SEND_REQ(huart_, UART_SENDBREAK_REQUEST);
-      while (__HAL_UART_GET_FLAG(huart_, UART_FLAG_SBKF))
-        ;
-      return 0;
-    }
-
-    inline void
-    uart::do_rs485_de (bool state __attribute__ ((unused)))
-    {
-      // do nothing, as the rs485 driver is enabled by the hardware.
     }
 
   } /* namespace driver */
