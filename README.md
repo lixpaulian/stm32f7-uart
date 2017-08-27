@@ -3,46 +3,46 @@ This is a µOS++ UART driver for the STM32F7xx family of controllers.
 
 The driver is functional, but several features are still missing (and the list is probably incomplete):
 * Further implementation of serial port control through `struct termios` (although the most useful flags have been implemented)
-* DCD signal handling (and perhaps modem signals handling too?)
+* DCD signal handling (and perhaps modem signals handling too)
 * The `fcntl` call
 
-The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu plans to support `termios` and friends in an upcoming version of the µOS++. Until then the `termios.h` and `fcntl.h` header files have been included with the driver. The lack of newlib support means that you cannot call `tcgetattr` and `tcsetattr` library functions. However, you can still access these functions directly from the driver (see the test example).
+The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu added support for `termios` and friends in µOS++ starting with version 6.3.13 (see the test example).
 
 The STM32Fxx family UARTs support only 7 and 8 bits characters, with or without parity. On the other hand, `termios` defines 5, 6, 7 and 8 bit characters, i.e. as CS5, CS6, CS7 and CS8, thus the driver supports only CS7 and CS8 modes.
 
 The current implementation supports CTS/RTS hardware handshaking and can be enabled/disabled over the `termios` structure. This functionality is implemented by the HAL and the STM32F7xx hardware.
 
-The `termios` VMIN and VTIM control characters are properly interpreted; in addition, because in embedded applications much shorter delays than 0.1 seconds are often required, we use a second control caracter (mapped onto "spare 2") to reach a finer grain timeout for VTIM. This control character can be refered as `c_cc[VTIM_MS]`, or `c_cc[VTIM + 2]` and can take values from 0 to 99 ms. The final timeout will be computed as `c_cc[VTIM] * 100 + c_cc[VTIM_MS]`. 
+The `termios` VMIN and VTIM control characters are properly interpreted; in addition, because in embedded applications much shorter delays than 0.1 seconds are often required, we use a second control caracter (mapped onto "spare 2") to reach a finer grain timeout for VTIM. This control character can be refered as `c_cc[VTIM_MS]`, or `c_cc[VTIM + 2]` and can take values from 0 to 99 ms. The final timeout will be computed as `c_cc[VTIM] * 100 + c_cc[VTIM_MS]`.
 
-The driver supports RS-485 half-duplex operation. There are two aspects to consider:
+The driver supports RS-485 half-duplex operation. There are several aspects to consider:
 
-* POSIX does not support explicitely RS-485 mode, therefore as an initial solution a new flag has been defined (O_RS485) that must be used when opening a port in RS-485 mode as shown below:
+POSIX does not support explicitely RS-485 mode, therefore RS-485 operation must be activated when instantiating the driver. For RS-485 mode, the `uart`constructor must be provided with two additional parameters: `bool is_rs485` and `uint32_t rs485_de_params`. The first parameter is obvious while the second is a composite of a) the driver enable polarity (`true` or `false`), b) the driver enable assertion time and c) the driver enable deassertion time:
 
 ```c
-	#define DEAT 10
-	#define DEDT 12
-	uint32_t mode = RS485_POLARITY | (DEDT << 8) | DEAT;
-	
-	if ((fd = open ("/dev/uart6", O_RS485, mode)) < 0)
-	 {
-	 	// handle error
-	 } 
+#define TX_BUFFER_SIZE 200
+#define RX_BUFFER_SIZE 200
+#define DEAT 10
+#define DEDT 12
+
+uart uart1
+  { "uart1", &huart1, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE, true,
+      RS485_DE_POLARITY_MASK | (DEDT << 8) | DEAT };
 ```
 
-* The STM32F7xx hardware has its built-in method of handling of the DE pin (driver enable); the pin is mapped onto the RTS pin. The initialization of the DE pin must be done externally, and if you use CubeMX this will be done automatically for you if the correct UART options are selected (e.g. RS-485 mode).
+In the example above, the `rs485_de_params` parameter is a composite of the following variables:
 
-In the example above, the `mode` parameter is a composite of the following variables:
-
-* Driver Enable Assertion Time: the least significant 8 bits (bits 0-7)
-* Driver Enable Deassertion Time: the next 8 bits (bits 8-15)
+* Driver Enable Assertion Time (DEAT): the least significant 8 bits (bits 0-7)
+* Driver Enable Deassertion Time (DEDT): the next 8 bits (bits 8-15)
 * Driver Enable Polarity: the most significant bit (bit 31)
 
-The first two values are expressed in number of sample time units (1/8 or 1/16 bit time, depending on the oversampling rate); they can be between 0 and 31. The Driver Enable Polarity will be 1 if the RS485_POLARITY is added to the `mode` argument. For more details consult the STM32F7xx family Reference Manual.
+The STM32F7xx hardware has its built-in method of handling of the DE pin (driver enable - this function is mapped onto the RTS pin). The initialization of the DE pin must be done externally, and if you use CubeMX this will be done automatically for you if the correct UART options are selected (e.g. RS-485 mode).
+
+The first two values are expressed in a number of sample time units (1/8 or 1/16 bit time, depending on the oversampling rate); they can be between 0 and 31. The Driver Enable Polarity will be 1 if the RS485_DE_POLARITY_MASK is added to the `rs485_de_params` argument. For more details consult the STM32F7xx family Reference Manual.
 
 If the DE pin used is not the one defined by the STM32F7xx hardware, you can derive your own uart class and replace the function `void uart::do_rs485_de (bool state)`. The same applies for sending breaks: you may want to replace the function `int uart::do_tcsendbreak (int duration)` with your own. The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, in the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored, whereas a custom implementation may/should use it. Such a custom function would probably reconfigure the UART's TxD pin as output port, then switch it low, wait for the specified amount of time in a uOS++ delay function, switch the port high and finally reconfigure the pin as TxD.
 
 ## Version
-* 1.10 (20 August 2017)
+* 1.20 (27 August 2017)
 
 ## License
 * MIT
@@ -59,6 +59,62 @@ The driver depends on the following software packages:
 Note that the hardware initialisations (uController clock, peripherals clocks, etc.) must be separately performed, normaly in, or called from the `initialize_hardware.c` file of a gnuarmeclipse project. Alternatively you can do this using the CubeMX generator from ST. You may find helpful to check the following projects as references:
 * https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus
 * https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus/cube-mx which details how to integrate the CubeMX generated code into a uOS++ based project.
+
+If you use CubeMX to initialize the UART(s), you have two choices: either you let the CubeMX generated the code to initialize the uart handle (as well as the UART itself) at startup, or you provide your own function to initialize only the uart handle, while the UART itself will be initialized by the driver. In the first case, you have to define the `UART_INITED_BY_CUBE_MX` symbol to `true` (by default it is set to `false`). The second solution is the preferred one. An example is given below, see the `USER CODE BEGIN 2` section  (from the CubeMX `main.c` generated file):
+
+```c
+int main(void)
+{
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* Enable I-Cache-------------------------------------------------------------*/
+  SCB_EnableICache();
+
+  /* Enable D-Cache-------------------------------------------------------------*/
+  SCB_EnableDCache();
+
+  /* MCU Configuration----------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_DMA_Init();
+
+  /* USER CODE BEGIN 2 */
+
+  /* init UART6 handle */
+  huart6.Instance = USART6;
+  huart6.Init.BaudRate = 115200;
+  huart6.Init.WordLength = UART_WORDLENGTH_8B;
+  huart6.Init.StopBits = UART_STOPBITS_1;
+  huart6.Init.Parity = UART_PARITY_NONE;
+  huart6.Init.Mode = UART_MODE_TX_RX;
+  huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart6.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart6.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  /* 'while' removed. */
+  /* USER CODE END WHILE */
+
+  /* USER CODE BEGIN 3 */
+  return 0;
+  /* USER CODE END 3 */
+
+}
+```
 
 The driver was designed for the µOS++ ecosystem.
 
