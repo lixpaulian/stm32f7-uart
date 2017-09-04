@@ -29,7 +29,7 @@ uart uart1
       RS485_DE_POLARITY_MASK | (DEDT << 8) | DEAT };
 ```
 
-In the example above, the `rs485_de_params` parameter is a composite of the following variables:
+In the example above, the `rs485_de_params` parameter is a composite of the following constants:
 
 * Driver Enable Assertion Time (DEAT): the least significant 8 bits (bits 0-7)
 * Driver Enable Deassertion Time (DEDT): the next 8 bits (bits 8-15)
@@ -39,7 +39,9 @@ The first two values are expressed in a number of sample time units (1/8 or 1/16
 
 The STM32F7xx hardware has its built-in method of handling of the DE pin (driver enable - this function is mapped onto the RTS pin). The initialization of the DE pin must be done externally, and if you use CubeMX this will be done automatically for you if the correct UART options are selected (e.g. RS-485 mode).
 
-If the DE pin used is not the one defined by the STM32F7xx hardware, you can derive your own uart class and replace the function `void uart::do_rs485_de (bool state)`. The same applies for sending breaks: you may want to replace the function `int uart::do_tcsendbreak (int duration)` with your own. The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, in the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored, whereas a custom implementation may/should use it. Such a custom function would probably reconfigure the UART's TxD pin as output port, then switch it low, wait for the specified amount of time in a uOS++ delay function, switch the port high and finally reconfigure the pin as TxD.
+If the DE pin used is not the one defined by the STM32F7xx hardware, you can derive your own uart class and replace the function `void uart::do_rs485_de (bool state)`. The same applies for sending breaks: you may want to replace the function `int uart::do_tcsendbreak (int duration)` with your own. An example of such an approach can be seen in the SDI-12 Data Recorder library that makes use of this driver (https://github.com/lixpaulian/sdi-12-dr).
+
+The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, in the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored, whereas a custom implementation may/should use it. Such a custom function would probably reconfigure the UART's TxD pin as output port, then switch it low, wait for the specified amount of time in a uOS++ delay function, switch the port high and finally reconfigure the pin as TxD.
 
 ## Version
 * 1.20 (27 August 2017)
@@ -60,7 +62,7 @@ Note that the hardware initialisations (uController clock, peripherals clocks, e
 * https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus
 * https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus/cube-mx which details how to integrate the CubeMX generated code into a uOS++ based project.
 
-If you use CubeMX to initialize the UART(s), you have two choices: either you let the CubeMX generated the code to initialize the uart handle (as well as the UART itself) at startup, or you provide your own function to initialize only the uart handle, while the UART itself will be initialized by the driver. In the first case, you have to define the `UART_INITED_BY_CUBE_MX` symbol to `true` (by default it is set to `false`). The second solution is the preferred one. An example is given below, see the `USER CODE BEGIN 2` section  (from the CubeMX `main.c` generated file):
+If you use CubeMX to initialize the UART(s), you have two choices: either you let the CubeMX generated code to initialize the uart handle (as well as the UART itself) at startup, or you provide your own function to initialize only the uart handle, while the UART itself will be initialized by the driver. In the first case, you have to define the `UART_INITED_BY_CUBE_MX` symbol to `true` (by default it is set to `false`). The second solution is the preferred one. An example is given below, see the `USER CODE BEGIN 2` section  (from the CubeMX `main.c` generated file):
 
 ```c
 int main(void)
