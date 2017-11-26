@@ -51,15 +51,35 @@ namespace os
 
       // --------------------------------------------------------------------
 
-      // driver enable polarity
-      static constexpr uint32_t RS485_DE_POLARITY_MASK = 0x80000000;
+      // description of the rs485_flags:
+      //
+      // b0: if true, RS-485/RS-422 mode, otherwise RS-232
+      // b1: if true, half_duplex mode (i.e. RS-485), otherwise RS-422
+      // b2: if true, Data Enable polarity pin is high
+      // b3 - b7: reserved
+      // b8 - b15: Data Enable pin Assertion Time (in UART sample intervals)
+      // b16 - b23: Data Enable pin Deassertion Time (in UART sample intervals)
+
+      static constexpr uint32_t RS485_HALF_DUPLEX_POS = 1;
+      static constexpr uint32_t RS485_DE_POLARITY_POS = 2;
+      static constexpr uint32_t RS485_DE_ASSERT_TIME_POS = 7;
+      static constexpr uint32_t RS485_DE_DEASSERT_TIME_POS = 15;
+
+      static constexpr uint32_t RS485_MASK = (1 << 0);
+      static constexpr uint32_t RS485_HALF_DUPLEX_MASK = (1
+          << RS485_HALF_DUPLEX_POS);
+      static constexpr uint32_t RS485_DE_POLARITY_MASK = (1 << RS485_DE_POLARITY_POS);
+      static constexpr uint32_t RS485_DE_ASSERT_TIME_MASK = (0x1F
+          << RS485_DE_ASSERT_TIME_POS);
+      static constexpr uint32_t RS485_DE_DEASSERT_TIME_MASK = (0x1F
+          << RS485_DE_DEASSERT_TIME_POS);
 
       uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
             uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
 
       uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
             uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size,
-            bool is_rs485, uint32_t rs485_de_params);
+            uint32_t rs485_params);
 
       uart (const uart&) = delete;
 
@@ -126,7 +146,7 @@ namespace os
       do_tcflush (int queue_selector) override;
 
       static constexpr uint8_t UART_DRV_VERSION_MAJOR = 1;
-      static constexpr uint8_t UART_DRV_VERSION_MINOR = 20;
+      static constexpr uint8_t UART_DRV_VERSION_MINOR = 30;
 
       UART_HandleTypeDef* huart_;
       uint8_t* tx_buff_;
@@ -145,7 +165,6 @@ namespace os
       bool volatile is_connected_ = false;
       bool volatile is_opened_ = false;
       bool volatile is_error_ = false;
-      bool volatile is_rs485_;
 
       bool volatile o_nonblock_ = false;
 
@@ -160,7 +179,7 @@ namespace os
 
     protected:
 
-      uint32_t rs485_de_params_;
+      uint32_t rs485_params_;
 
     };
 

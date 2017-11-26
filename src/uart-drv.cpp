@@ -49,14 +49,14 @@ namespace os
     uart::uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
                 uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size) : //
         uart
-          { name, huart, tx_buff, rx_buff, tx_buff_size, rx_buff_size, false, 0 } //
+          { name, huart, tx_buff, rx_buff, tx_buff_size, rx_buff_size, 0 } //
     {
       ;
     }
 
     uart::uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
                 uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size,
-                bool is_rs485, uint32_t rs485_de_params) : //
+                uint32_t rs485_params) : //
         tty
           { name }, //
         huart_
@@ -69,10 +69,8 @@ namespace os
           { tx_buff_size }, //
         rx_buff_size_
           { rx_buff_size }, //
-        is_rs485_
-          { is_rs485 }, //
-        rs485_de_params_
-          { rs485_de_params }
+        rs485_params_
+          { rs485_params }
     {
       trace::printf ("%s() %p\n", __func__, this);
 
@@ -118,14 +116,17 @@ namespace os
             }
 
           // initialize the UART
-          if (is_rs485_)
+          if (rs485_params_ & RS485_MASK)
             {
-              if ((hal_result = HAL_RS485Ex_Init (huart_, //
-                  rs485_de_params_ & RS485_DE_POLARITY_MASK ? //
+              if ((hal_result = HAL_RS485Ex_Init (
+                  huart_, //
+                  rs485_params_ & RS485_DE_POLARITY_MASK ? //
                   UART_DE_POLARITY_HIGH :
-                  UART_DE_POLARITY_LOW, //
-                  rs485_de_params_ & 0xFF, (rs485_de_params_ & 0xFF) >> 8))
-                  != HAL_OK)
+                  UART_DE_POLARITY_LOW,
+                  (rs485_params_ & RS485_DE_ASSERT_TIME_MASK)
+                      >> RS485_DE_ASSERT_TIME_POS,
+                  (rs485_params_ & RS485_DE_DEASSERT_TIME_MASK)
+                      >> RS485_DE_DEASSERT_TIME_POS)) != HAL_OK)
                 {
                   break;
                 }
