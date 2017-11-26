@@ -6,7 +6,7 @@ The driver is functional, but several features are still missing (and the list i
 * DCD signal handling (and perhaps modem signals handling too)
 * The `fcntl` call
 
-The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that Liviu added support for `termios` and friends in µOS++ starting with version 6.3.13 (see the test example).
+The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that starting with version 6.3.13 Liviu added initial support for `termios` and friends in µOS++ (see the test example).
 
 The STM32Fxx family UARTs supports only 7 and 8 bits characters, with or without parity. On the other hand, `termios` defines 5, 6, 7 and 8 bit characters, i.e. as CS5, CS6, CS7 and CS8, thus the driver supports only CS7 and CS8 modes.
 
@@ -16,7 +16,14 @@ The `termios` VMIN and VTIM control characters are properly interpreted; in addi
 
 The driver supports RS-485 half-duplex operation. There are several aspects to consider:
 
-POSIX does not support explicitely RS-485 mode, therefore RS-485 operation must be activated when instantiating the driver. For RS-485 mode, the `uart`constructor must be provided with two additional parameters: `bool is_rs485` and `uint32_t rs485_de_params`. The first parameter is obvious, while the second is a composite of a) the driver enable polarity (`true` or `false`), b) the driver enable assertion time and c) the driver enable deassertion time:
+POSIX does not support explicitely RS-485 mode, therefore RS-485 operation must be activated when instantiating the driver. For RS-485 mode, the `uart`constructor must be provided with an additional parameter: `uint32_t rs485_params` which is a composite of several flags:
+
+* b0: if true, RS-485/RS-422 mode, otherwise RS-232
+* b1: if true, half_duplex mode (i.e. RS-485), otherwise RS-422
+* b2: if true, Data Enable polarity pin is high
+* b3 - b7: reserved
+* b8 - b15: Data Enable pin Assertion Time (in UART sample intervals)
+* b16 - b23: Data Enable pin Deassertion Time (in UART sample intervals)
 
 ```c
 #define TX_BUFFER_SIZE 200
@@ -25,17 +32,13 @@ POSIX does not support explicitely RS-485 mode, therefore RS-485 operation must 
 #define DEDT 12
 
 uart uart1
-  { "uart1", &huart1, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE, true,
-      RS485_DE_POLARITY_MASK | (DEDT << 8) | DEAT };
+  { "uart1", &huart1, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE,
+      RS485_MASK | RS485_DE_POLARITY_MASK |
+      (DEAT << RS485_DE_ASSERT_TIME_POS) |
+      (DEDT << RS485_DE_DEASSERT_TIME_POS) };
 ```
 
-In the example above, the `rs485_de_params` parameter is a composite of the following constants:
-
-* Driver Enable Assertion Time (DEAT): the least significant 8 bits (bits 0-7)
-* Driver Enable Deassertion Time (DEDT): the next 8 bits (bits 8-15)
-* Driver Enable Polarity: the most significant bit (bit 31)
-
-The first two values are expressed in a number of sample time units (1/8 or 1/16 bit time, depending on the oversampling rate); they can be between 0 and 31. The Driver Enable Polarity will be 1 if the RS485_DE_POLARITY_MASK is added to the `rs485_de_params` argument. For more details consult the STM32F7xx family Reference Manual.
+DEAT and DEDT are expressed in a number of sample time units (1/8 or 1/16 bit time, depending on the oversampling rate); they can be between 0 and 31. The Driver Enable Polarity will be 1 if the RS485_DE_POLARITY_MASK is added to the `rs485_params` argument. For more details consult the STM32F7xx family Reference Manual.
 
 The STM32F7xx hardware has its built-in method of handling of the DE pin (driver enable - this function is mapped onto the RTS pin). The initialization of the DE pin must be done externally, and if you use CubeMX this will be done automatically for you if the correct UART options are selected (e.g. RS-485 mode).
 
@@ -44,7 +47,9 @@ If the DE pin used is not the one defined by the STM32F7xx hardware, you can der
 The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, in the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored, whereas a custom implementation may/should use it. Such a custom function would probably reconfigure the UART's TxD pin as output port, then switch it low, wait for the specified amount of time in a uOS++ delay function, switch the port high and finally reconfigure the pin as TxD.
 
 ## Version
-* 1.20 (27 August 2017)
+* 1.30 (26 November 2017)
+
+Note that from version 1.20 to 1.30 there was an API change: if you want to use the driver in RS-485 mode, the parameters to the constructor are different.
 
 ## License
 * MIT
