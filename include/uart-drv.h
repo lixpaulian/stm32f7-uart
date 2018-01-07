@@ -36,7 +36,6 @@
 #include <fcntl.h>
 
 #include "cmsis_device.h"
-#include "stm32f7xx_hal_usart.h"
 
 #if defined (__cplusplus)
 
