@@ -1,7 +1,7 @@
 /*
- * uart-drv.h
+ * uart-cdc-dev.h
  *
- * Copyright (c) 2017 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2018 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -24,11 +24,11 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Created on: 11 Jun 2017 (LNP)
+ * Created on: 13 Jan 2018 (LNP)
  */
 
-#ifndef INCLUDE_UART_DRV_H_
-#define INCLUDE_UART_DRV_H_
+#ifndef INCLUDE_UART_CDC_DEV_H_
+#define INCLUDE_UART_CDC_DEV_H_
 
 #include <cmsis-plus/rtos/os.h>
 #include <cmsis-plus/posix-io/tty.h>
@@ -36,6 +36,7 @@
 #include <fcntl.h>
 
 #include "cmsis_device.h"
+#include "usbd_cdc_if.h"
 
 #if defined (__cplusplus)
 
@@ -45,77 +46,52 @@ namespace os
   {
     namespace stm32f7
     {
-      class uart : public os::posix::tty
+      class uart_cdc_dev : public os::posix::tty
       {
+
       public:
 
-        // --------------------------------------------------------------------
+        uart_cdc_dev (const char* name, uint8_t usb_id, uint8_t* tx_buff,
+                  uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
 
-        // description of the rs485_flags:
-        //
-        // b0: if true, RS-485/RS-422 mode, otherwise RS-232
-        // b1: if true, half_duplex mode (i.e. RS-485), otherwise RS-422
-        // b2: if true, Data Enable polarity pin is high
-        // b3 - b7: reserved
-        // b8 - b15: Data Enable pin Assertion Time (in UART sample intervals)
-        // b16 - b23: Data Enable pin Deassertion Time (in UART sample intervals)
+        uart_cdc_dev (const uart_cdc_dev&) = delete;
 
-        static constexpr uint32_t RS485_HALF_DUPLEX_POS = 1;
-        static constexpr uint32_t RS485_DE_POLARITY_POS = 2;
-        static constexpr uint32_t RS485_DE_ASSERT_TIME_POS = 7;
-        static constexpr uint32_t RS485_DE_DEASSERT_TIME_POS = 15;
+        uart_cdc_dev (uart_cdc_dev&&) = delete;
 
-        static constexpr uint32_t RS485_MASK = (1 << 0);
-        static constexpr uint32_t RS485_HALF_DUPLEX_MASK = (1
-            << RS485_HALF_DUPLEX_POS);
-        static constexpr uint32_t RS485_DE_POLARITY_MASK = (1
-            << RS485_DE_POLARITY_POS);
-        static constexpr uint32_t RS485_DE_ASSERT_TIME_MASK = (0x1F
-            << RS485_DE_ASSERT_TIME_POS);
-        static constexpr uint32_t RS485_DE_DEASSERT_TIME_MASK = (0x1F
-            << RS485_DE_DEASSERT_TIME_POS);
+        uart_cdc_dev&
+        operator= (const uart_cdc_dev&) = delete;
 
-        uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
-              uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
-
-        uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
-              uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size,
-              uint32_t rs485_params);
-
-        uart (const uart&) = delete;
-
-        uart (uart&&) = delete;
-
-        uart&
-        operator= (const uart&) = delete;
-
-        uart&
-        operator= (uart&&) = delete;
+        uart_cdc_dev&
+        operator= (uart_cdc_dev&&) = delete;
 
         virtual
-        ~uart () noexcept;
+        ~uart_cdc_dev () noexcept;
 
         void
         get_version (uint8_t& version_major, uint8_t& version_minor);
 
         // driver specific, not inherited functions
-        void
-        cb_tx_event (void);
 
-        void
-        cb_rx_event (bool half);
+        int8_t
+        cb_init_event (void);
 
-        // --------------------------------------------------------------------
+        int8_t
+        cb_deinit_event (void);
+
+        int8_t
+        cb_control_event (uint8_t cmd, uint8_t* pbuf, uint16_t len);
+
+        int8_t
+        cb_receive_event (uint8_t* pbuf, uint32_t *len);
+
+// --------------------------------------------------------------------
 
       protected:
 
         virtual int
         do_tcsendbreak (int duration) override;
 
-        virtual void
-        do_rs485_de (bool state);
-
-        // --------------------------------------------------------------------
+// --------------------------------------------------------------------
 
       private:
 
@@ -146,16 +122,18 @@ namespace os
         virtual int
         do_tcflush (int queue_selector) override;
 
-        static constexpr uint8_t UART_DRV_VERSION_MAJOR = 1;
-        static constexpr uint8_t UART_DRV_VERSION_MINOR = 30;
+        static constexpr uint8_t VERSION_MAJOR = 0;
+        static constexpr uint8_t VERSION_MINOR = 5;
 
-        UART_HandleTypeDef* huart_;
+        uint8_t usb_id_;
+        uint8_t* cdc_buff_;
+        int packet_size_;
+        USBD_HandleTypeDef* husbd_;
+
         uint8_t* tx_buff_;
         uint8_t* rx_buff_;
         size_t tx_buff_size_;
         size_t rx_buff_size_;
-        size_t volatile tx_in_;
-        size_t volatile tx_out_;
         size_t volatile rx_in_;
         size_t volatile rx_out_;
         bool tx_buff_dyn_;
@@ -173,14 +151,10 @@ namespace os
         uint8_t volatile cc_vtime_ = 0; // timeout indefinitely
         uint8_t volatile cc_vtime_milli_ = 0; // extension to VTIME: timeout in ms
 
-        os::rtos::semaphore_binary tx_sem_
-          { "tx", 1 };
+        os::rtos::semaphore_binary init_sem_
+          { "init", 0 };
         os::rtos::semaphore_binary rx_sem_
           { "rx", 0 };
-
-      protected:
-
-        uint32_t rs485_params_;
 
       };
 
@@ -190,16 +164,15 @@ namespace os
        * @param  version_minor: minor version.
        */
       inline void
-      uart::get_version (uint8_t& version_major, uint8_t& version_minor)
+      uart_cdc_dev::get_version (uint8_t& version_major, uint8_t& version_minor)
       {
-        version_major = UART_DRV_VERSION_MAJOR;
-        version_minor = UART_DRV_VERSION_MINOR;
+        version_major = VERSION_MAJOR;
+        version_minor = VERSION_MINOR;
       }
-
     } /* namespace stm32f7 */
   } /* namespace driver */
 } /* namespace os */
 
 #endif /* __cplusplus */
 
-#endif /* INCLUDE_UART_DRV_H_ */
+#endif /* INCLUDE_UART_CDC_DEV_H_ */

@@ -1,7 +1,7 @@
 /*
- * test-uart.cpp
+ * test-cdc-dev.cpp
  *
- * Copyright (c) 2017 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2018 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -24,7 +24,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Created on: 16 Jun 2017 (LNP)
+ * Created on: 15 Jan 2018 (LNP)
  */
 
 #include <stdio.h>
@@ -36,17 +36,11 @@
 #include <cmsis-plus/diag/trace.h>
 #include <cmsis-plus/posix-io/file-descriptors-manager.h>
 
-#include "uart-drv.h"
-#include "io.h"
 #include "sysconfig.h"
+#include "test-cdc-dev.h"
+#include "usbd_cdc_if.h"
 
-
-#if (UART_TEST == true || CONSOLE_ON_UART6 == true)
-
-extern "C"
-{
-  UART_HandleTypeDef huart6;
-}
+#if (UART_CDC_DEV_TEST == true)
 
 using namespace os;
 using namespace os::rtos;
@@ -56,86 +50,93 @@ using namespace os::driver::stm32f7;
 os::posix::file_descriptors_manager descriptors_manager
   { 8 };
 
-#define TX_BUFFER_SIZE 200
-#define RX_BUFFER_SIZE 200
+#define TX_BUFFER_SIZE 400
+#define RX_BUFFER_SIZE 400
 
-#define TEST_ROUNDS 10
-#define WRITE_READ_ROUNDS 10
+#define CTRL_C 3
 
+// Note: both USB peripherals are instantiated to show how two DCD devices can
+// be implemented. However, in the example below only one peripheral is used.
 
-static ssize_t
-targeted_read (os::posix::tty* filedes, char *buffer, size_t expected_size);
+uart_cdc_dev cdc0
+  { "cdc0", DEVICE_FS, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE };
 
-uart uart6
-  { "uart6", &huart6, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE };
+uart_cdc_dev cdc1
+  { "cdc1", DEVICE_HS, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE };
 
-void
-HAL_UART_TxCpltCallback (UART_HandleTypeDef *huart)
+int8_t
+cdc_init (USBD_HandleTypeDef* husbd)
 {
-  if (huart->Instance == huart6.Instance)
+  if (husbd->id == DEVICE_FS)
     {
-      uart6.cb_tx_event ();
+      return cdc0.cb_init_event ();
     }
+  if (husbd->id == DEVICE_HS)
+    {
+      return cdc1.cb_init_event ();
+    }
+  return USBD_OK;
 }
 
-void
-HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
+int8_t
+cdc_deinit (USBD_HandleTypeDef* husbd)
 {
-  if (huart->Instance == huart6.Instance)
+  if (husbd->id == DEVICE_FS)
     {
-      uart6.cb_rx_event (false);
+      return cdc0.cb_deinit_event ();
     }
+  if (husbd->id == DEVICE_HS)
+    {
+      return cdc1.cb_deinit_event ();
+    }
+  return USBD_OK;
 }
 
-void
-HAL_UART_RxHalfCpltCallback (UART_HandleTypeDef *huart)
+int8_t
+cdc_control (USBD_HandleTypeDef* husbd, uint8_t cmd, uint8_t* pbuf,
+             uint16_t length)
 {
-  if (huart->Instance == huart6.Instance)
+  if (husbd->id == DEVICE_FS)
     {
-      uart6.cb_rx_event (true);
+      return cdc0.cb_control_event (cmd, pbuf, length);
     }
+  if (husbd->id == DEVICE_HS)
+    {
+      return cdc1.cb_control_event (cmd, pbuf, length);
+    }
+  return USBD_OK;
 }
 
-void
-HAL_UART_ErrorCallback (UART_HandleTypeDef *huart)
+int8_t
+cdc_receive (USBD_HandleTypeDef* husbd, uint8_t* buf, uint32_t *len)
 {
-  if (huart->Instance == huart6.Instance)
+  if (husbd->id == DEVICE_FS)
     {
-      uart6.cb_rx_event (false);
+      return cdc0.cb_receive_event (buf, len);
     }
+  if (husbd->id == DEVICE_HS)
+    {
+      return cdc1.cb_receive_event (buf, len);
+    }
+  return USBD_OK;
 }
 
 /**
  * @brief  This is a test function that exercises the UART driver.
  */
 void
-test_uart (void)
+test_uart_cdc (void)
 {
-  int count;
-  char text[] =
-    { "The quick brown fox jumps over the lazy dog 1234567890\r\n" };
-  char text_end[] =
-    { "---------\r\n" };
-  char buffer[100];
+  int leave = false;
 
-#ifdef M717
-  // configure the MPI interface
-  mpi_ctrl mpi
-    { };
+  char buffer[520];
 
-  /* set to RS232 */
-  mpi.init_pins ();
-  mpi.rs485 (false);
-  mpi.shutdown (false);
-  mpi.half_duplex (false);
-#endif
+  os::posix::tty* tty;
 
-  for (int i = 0; i < TEST_ROUNDS; i++)
+  while (1)
     {
-      os::posix::tty* tty;
-
       // open the serial device
-      tty = static_cast<os::posix::tty*> (os::posix::open ("/dev/uart6", 0));
+      tty = static_cast<os::posix::tty*> (os::posix::open ("/dev/cdc1", 0));
       if (tty == nullptr)
         {
           trace::printf ("Error at open\n");
@@ -164,80 +165,46 @@ test_uart (void)
                   (tios.c_cflag & CRTSCTS) == CRTS_IFLOW ? "RTS" : "none");
             }
 
-          for (int j = 0; j < WRITE_READ_ROUNDS; j++)
+          for (;;)
             {
-              // send text
-              if ((count = tty->write (text, strlen (text))) < 0)
-                {
-                  trace::printf ("Error at write (%d)\n", j);
-                  break;
-                }
+              int count;
 
               // read text
-              count = targeted_read (tty, buffer, strlen (text));
+              count = tty->read (buffer, sizeof(buffer));
+              trace::printf ("got %d\n", count);
+              if (buffer[0] == CTRL_C)
+                {
+                  leave = true;
+                  break;
+                }
               if (count > 0)
                 {
-                  buffer[count] = '\0';
-                  trace::printf ("%s", buffer);
+                  count = tty->write (buffer, count);
+                  trace::printf ("sent %d\n", count);
+                  if (count < 0)
+                    {
+                      trace::printf ("Error at write\n");
+                      break;
+                    }
                 }
-              else
+              else if (count < 0)
                 {
                   trace::printf ("Error reading data\n");
+                  break;
                 }
-            }
-
-          // send separating dashes
-          if ((count = tty->write (text_end, strlen (text_end))) < 0)
-            {
-              trace::printf ("Error at write end text\n");
-              break;
-            }
-
-          // read separating dashes
-          count = targeted_read (tty, buffer, strlen (text_end));
-          if (count > 0)
-            {
-              buffer[count] = '\0';
-              trace::printf ("%s", buffer);
-            }
-          else
-            {
-              trace::printf ("Error reading separator\n");
             }
 
           // close the serial device
           if (tty->close () < 0)
             {
               trace::printf ("Error at close\n");
-              break;
             }
         }
-    }
-}
-
-/**
- * @brief This function waits to read a known amount of bytes before returning.
- * @param fd: file descriptor.
- * @param buffer: buffer to return data into.
- * @param expected_size: the expected number of characters to wait for.
- * @return The number of characters read or an error if negative.
- */
-static ssize_t
-targeted_read (os::posix::tty* tty, char *buffer, size_t expected_size)
-{
-  int count, total = 0;
-
-  do
-    {
-      if ((count = tty->read (buffer + total, expected_size - total)) < 0)
+      if (leave == true)
         {
-          break;
+          break;        // exit
         }
-      total += count;
     }
-  while (total < (int) expected_size);
-
-  return total;
 }
 
 #endif
