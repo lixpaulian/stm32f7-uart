@@ -347,6 +347,10 @@ namespace os
                     rx_out_ = 0;
                   }
               }
+            if (count >= (ssize_t) nbyte)
+              {
+                break;
+              }
           }
         while (count < cc_vmin_);
 
