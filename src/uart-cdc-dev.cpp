@@ -298,7 +298,8 @@ namespace os
             // wait for possible previous ongoing write operation to finish
             while (pcd->TxState != 0)
               {
-                // busy, wait
+                // busy, wait one tick
+                os::rtos::sysclock.sleep_for (1);
               }
 
             memcpy (tx_buff_, p + total,
@@ -333,7 +334,8 @@ namespace os
             // send a zero length packet
             while (pcd->TxState != 0)
               {
-                // busy, wait
+                // busy, wait one tick
+                os::rtos::sysclock.sleep_for (1);
               }
             USBD_CDC_SetTxBuffer (husbd_, tx_buff_, 0);
             USBD_CDC_TransmitPacket (husbd_);
@@ -432,7 +434,7 @@ namespace os
                     (USBD_CDC_HandleTypeDef*) husbd_->pClassData;
                 while (pcd->TxState != 0)
                   {
-                    // busy, wait
+                    // busy, wait one tick
                     rtos::sysclock.sleep_for (1);
                   }
               }
