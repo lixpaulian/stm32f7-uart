@@ -42,9 +42,9 @@ namespace os
     namespace stm32f7
     {
 
-      uart_cdc_dev::uart_cdc_dev (const char* name, uint8_t usb_id, uint8_t* tx_buff,
-                          uint8_t* rx_buff, size_t tx_buff_size,
-                          size_t rx_buff_size) : //
+      uart_cdc_dev::uart_cdc_dev (const char* name, uint8_t usb_id,
+                                  uint8_t* tx_buff, uint8_t* rx_buff,
+                                  size_t tx_buff_size, size_t rx_buff_size) : //
           tty
             { name }, //
           usb_id_
@@ -81,7 +81,7 @@ namespace os
                 break;
               }
 
-            // initialize FIFOs and semaphores
+            // initialize FIFO
             rx_in_ = rx_out_ = 0;
 
             // reset semaphores
@@ -262,9 +262,15 @@ namespace os
                   {
                     rx_out_ = 0;
                   }
-              }   // TODO: check and wait for last packet condition
+              }
+            if (count >= (ssize_t) nbyte)
+              {
+                break;
+              }
           }
-        while (count < cc_vmin_);
+        while (last_packet_ == false || count < cc_vmin_);
+
+        last_packet_ = false;
 
         return count;
       }
@@ -469,6 +475,7 @@ namespace os
               {
                 rx_sem_.reset ();
                 rx_in_ = rx_out_ = 0;
+                last_packet_ = false;
               }
 
             if (queue_selector & TCOFLUSH)
@@ -547,6 +554,13 @@ namespace os
         // restart receive
         USBD_CDC_SetRxBuffer (husbd_, cdc_buff_);
         USBD_CDC_ReceivePacket (husbd_);
+
+        // last packet?
+        xfered = *len;
+        if (xfered == 0 || xfered % packet_size_ > 0)
+          {
+            last_packet_ = true; // yes
+          }
 
         // inform background we have something
         rx_sem_.post ();
