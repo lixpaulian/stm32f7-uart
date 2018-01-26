@@ -147,7 +147,7 @@ namespace os
         do_tcflush (int queue_selector) override;
 
         static constexpr uint8_t UART_DRV_VERSION_MAJOR = 1;
-        static constexpr uint8_t UART_DRV_VERSION_MINOR = 30;
+        static constexpr uint8_t UART_DRV_VERSION_MINOR = 31;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;

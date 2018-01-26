@@ -123,11 +123,12 @@ namespace os
         do_tcflush (int queue_selector) override;
 
         static constexpr uint8_t VERSION_MAJOR = 0;
-        static constexpr uint8_t VERSION_MINOR = 5;
+        static constexpr uint8_t VERSION_MINOR = 6;
 
         uint8_t usb_id_;
         uint8_t* cdc_buff_;
         int packet_size_;
+        bool volatile last_packet_ = false;
         USBD_HandleTypeDef* husbd_;
 
         uint8_t* tx_buff_;
