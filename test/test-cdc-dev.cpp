@@ -40,7 +40,7 @@
 #include "test-cdc-dev.h"
 #include "usbd_cdc_if.h"
 
-#if (UART_CDC_DEV_TEST == true)
+#if (UART_CDC_DEV_TEST == true || CONSOLE_ON_VCP == true)
 
 using namespace os;
 using namespace os::rtos;
