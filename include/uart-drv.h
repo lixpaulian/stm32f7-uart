@@ -45,7 +45,7 @@ namespace os
   {
     namespace stm32f7
     {
-      class uart : public os::posix::tty
+      class uart : public posix::tty
       {
       public:
 
@@ -173,9 +173,9 @@ namespace os
         uint8_t volatile cc_vtime_ = 0; // timeout indefinitely
         uint8_t volatile cc_vtime_milli_ = 0; // extension to VTIME: timeout in ms
 
-        os::rtos::semaphore_binary tx_sem_
+        rtos::semaphore_binary tx_sem_
           { "tx", 1 };
-        os::rtos::semaphore_binary rx_sem_
+        rtos::semaphore_binary rx_sem_
           { "rx", 0 };
 
       protected:
