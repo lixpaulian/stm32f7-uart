@@ -68,20 +68,6 @@ my_char cdc0
 my_char cdc1
   { "cdc1", (uint8_t) DEVICE_HS, nullptr, nullptr, (size_t) TX_BUFFER_SIZE, (size_t) RX_BUFFER_SIZE };
 
-//class babu
-//{
-//public:
-//
-//  babu (void)
-//  {
-//    cdc1.impl ().config (DEVICE_HS, nullptr, nullptr, TX_BUFFER_SIZE,
-//                         RX_BUFFER_SIZE);
-//    cdc0.impl ().config (DEVICE_FS, nullptr, nullptr, TX_BUFFER_SIZE,
-//                         RX_BUFFER_SIZE);
-//  }
-//} ;
-
-//babu my_babu;
 
 int8_t
 cdc_init (USBD_HandleTypeDef* husbd)

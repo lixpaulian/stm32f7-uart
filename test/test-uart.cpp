@@ -67,14 +67,14 @@ static ssize_t
 targeted_read (os::posix::tty* filedes, char *buffer, size_t expected_size);
 
 uart uart6
-  { "uart6", &huart6, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE };
+  { "uart6", &huart6, nullptr, nullptr, (size_t) TX_BUFFER_SIZE, (size_t) RX_BUFFER_SIZE };
 
 void
 HAL_UART_TxCpltCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == huart6.Instance)
     {
-      uart6.cb_tx_event ();
+      uart6.impl ().cb_tx_event ();
     }
 }
 
@@ -83,7 +83,7 @@ HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == huart6.Instance)
     {
-      uart6.cb_rx_event (false);
+      uart6.impl ().cb_rx_event (false);
     }
 }
 
@@ -92,7 +92,7 @@ HAL_UART_RxHalfCpltCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == huart6.Instance)
     {
-      uart6.cb_rx_event (true);
+      uart6.impl ().cb_rx_event (true);
     }
 }
 
@@ -101,7 +101,7 @@ HAL_UART_ErrorCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == huart6.Instance)
     {
-      uart6.cb_rx_event (false);
+      uart6.impl ().cb_rx_event (false);
     }
 }
 
