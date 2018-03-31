@@ -35,7 +35,6 @@
 #include <cmsis-plus/posix/termios.h>
 #include <fcntl.h>
 
-#include "cmsis_device.h"
 
 #if defined (__cplusplus)
 
@@ -45,7 +44,10 @@ namespace os
   {
     namespace stm32f7
     {
-      class uart : public posix::tty
+      class uart_impl;
+      using uart = posix::tty_implementable<uart_impl>;
+
+      class uart_impl : public posix::tty_impl
       {
       public:
 
@@ -75,25 +77,26 @@ namespace os
         static constexpr uint32_t RS485_DE_DEASSERT_TIME_MASK = (0x1F
             << RS485_DE_DEASSERT_TIME_POS);
 
-        uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
-              uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
+        uart_impl (posix::tty& self, UART_HandleTypeDef* huart,
+                   uint8_t* tx_buff, uint8_t* rx_buff, size_t tx_buff_size,
+                   size_t rx_buff_size);
 
-        uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
-              uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size,
-              uint32_t rs485_params);
+        uart_impl (posix::tty& self, UART_HandleTypeDef* huart,
+                   uint8_t* tx_buff, uint8_t* rx_buff, size_t tx_buff_size,
+                   size_t rx_buff_size, uint32_t rs485_params);
 
-        uart (const uart&) = delete;
+        uart_impl (const uart_impl&) = delete;
 
-        uart (uart&&) = delete;
+        uart_impl (uart_impl&&) = delete;
 
-        uart&
-        operator= (const uart&) = delete;
+        uart_impl&
+        operator= (const uart_impl&) = delete;
 
-        uart&
-        operator= (uart&&) = delete;
+        uart_impl&
+        operator= (uart_impl&&) = delete;
 
         virtual
-        ~uart () noexcept;
+        ~uart_impl () noexcept;
 
         void
         get_version (uint8_t& version_major, uint8_t& version_minor);
@@ -146,6 +149,12 @@ namespace os
         virtual int
         do_tcflush (int queue_selector) override;
 
+        virtual int
+        do_vioctl (int request, std::va_list args) override;
+
+        virtual int
+        do_tcdrain (void) override;
+
         static constexpr uint8_t UART_DRV_VERSION_MAJOR = 1;
         static constexpr uint8_t UART_DRV_VERSION_MINOR = 31;
 
@@ -190,7 +199,7 @@ namespace os
        * @param  version_minor: minor version.
        */
       inline void
-      uart::get_version (uint8_t& version_major, uint8_t& version_minor)
+      uart_impl::get_version (uint8_t& version_major, uint8_t& version_minor)
       {
         version_major = UART_DRV_VERSION_MAJOR;
         version_minor = UART_DRV_VERSION_MINOR;

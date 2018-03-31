@@ -43,11 +43,11 @@ namespace os
     namespace stm32f7
     {
 
-      uart_cdc_dev::uart_cdc_dev (const char* name, uint8_t usb_id,
+      uart_cdc_dev::uart_cdc_dev (posix::tty& self, uint8_t usb_id,
                                   uint8_t* tx_buff, uint8_t* rx_buff,
                                   size_t tx_buff_size, size_t rx_buff_size) : //
-          tty
-            { name }, //
+          tty_impl
+            { self }, //
           usb_id_
             { usb_id }, //
           tx_buff_
@@ -67,6 +67,17 @@ namespace os
         trace::printf ("%s() %p\n", __func__, this);
 
         is_opened_ = false;
+      }
+
+      void
+      uart_cdc_dev::config (uint8_t usb_id, uint8_t* tx_buff, uint8_t* rx_buff,
+                            size_t tx_buff_size, size_t rx_buff_size)
+      {
+        usb_id_ = usb_id;
+        tx_buff_ = tx_buff;
+        rx_buff_ = rx_buff;
+        tx_buff_size_ = tx_buff_size;
+        rx_buff_size_ = rx_buff_size;
       }
 
       int
@@ -500,6 +511,19 @@ namespace os
       {
         return 0;
       }
+
+      int
+      uart_cdc_dev::do_vioctl (int request, std::va_list args)
+      {
+        return -1;
+      }
+
+      int
+      uart_cdc_dev::do_tcdrain (void)
+      {
+        return -1;      // TODO: implement
+      }
+
 
 // --------------------------------------------------------------------
 

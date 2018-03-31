@@ -42,25 +42,30 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
+// Explicit template instantiation.
+template class os::posix::tty_implementable<os::driver::stm32f7::uart_impl>;
+
 namespace os
 {
   namespace driver
   {
     namespace stm32f7
     {
-      uart::uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
-                  uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size) : //
-          uart
-            { name, huart, tx_buff, rx_buff, tx_buff_size, rx_buff_size, 0 } //
+      uart_impl::uart_impl (posix::tty& self, UART_HandleTypeDef* huart,
+                            uint8_t* tx_buff, uint8_t* rx_buff,
+                            size_t tx_buff_size, size_t rx_buff_size) :
+          uart_impl
+            { self, huart, tx_buff, rx_buff, tx_buff_size, rx_buff_size, 0 } //
       {
         ;
       }
 
-      uart::uart (const char* name, UART_HandleTypeDef* huart, uint8_t* tx_buff,
-                  uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size,
-                  uint32_t rs485_params) : //
-          tty
-            { name }, //
+      uart_impl::uart_impl (posix::tty& self, UART_HandleTypeDef* huart,
+                            uint8_t* tx_buff, uint8_t* rx_buff,
+                            size_t tx_buff_size, size_t rx_buff_size,
+                            uint32_t rs485_params) : //
+          tty_impl
+            { self }, //
           huart_
             { huart }, //
           tx_buff_
@@ -89,7 +94,7 @@ namespace os
         rx_buff_size_ % 2 ? rx_buff_size_-- : rx_buff_size_;
       }
 
-      uart::~uart ()
+      uart_impl::~uart_impl ()
       {
         trace::printf ("%s() %p\n", __func__, this);
 
@@ -98,7 +103,7 @@ namespace os
       }
 
       int
-      uart::do_vopen (const char* path, int oflag, std::va_list args)
+      uart_impl::do_vopen (const char* path, int oflag, std::va_list args)
       {
         HAL_StatusTypeDef hal_result = HAL_OK;
         int result = -1;
@@ -253,7 +258,7 @@ namespace os
       }
 
       int
-      uart::do_close (void)
+      uart_impl::do_close (void)
       {
         // wait for possible ongoing write operation to finish
         while (huart_->gState == HAL_UART_STATE_BUSY_TX)
@@ -290,7 +295,7 @@ namespace os
       }
 
       ssize_t
-      uart::do_read (void* buf, std::size_t nbyte)
+      uart_impl::do_read (void* buf, std::size_t nbyte)
       {
         uint8_t* lbuf = (uint8_t *) buf;
         ssize_t count = 0;
@@ -359,7 +364,7 @@ namespace os
       }
 
       ssize_t
-      uart::do_write (const void* buf, std::size_t nbyte)
+      uart_impl::do_write (const void* buf, std::size_t nbyte)
       {
         HAL_StatusTypeDef result;
         ssize_t count = 0;
@@ -410,19 +415,19 @@ namespace os
       }
 
       bool
-      uart::do_is_opened (void)
+      uart_impl::do_is_opened (void)
       {
         return is_opened_;
       }
 
       bool
-      uart::do_is_connected (void)
+      uart_impl::do_is_connected (void)
       {
         return true;      // TODO: check DCD, but where's the DCD line?
       }
 
       int
-      uart::do_tcgetattr (struct termios *ptio)
+      uart_impl::do_tcgetattr (struct termios *ptio)
       {
         // clear the termios structure
         bzero ((void *) ptio, sizeof(struct termios));
@@ -469,7 +474,7 @@ namespace os
       }
 
       int
-      uart::do_tcsetattr (int options, const struct termios *ptio)
+      uart_impl::do_tcsetattr (int options, const struct termios *ptio)
       {
         HAL_StatusTypeDef result;
 
@@ -580,7 +585,7 @@ namespace os
       }
 
       int
-      uart::do_tcflush (int queue_selector)
+      uart_impl::do_tcflush (int queue_selector)
       {
         HAL_StatusTypeDef hal_result;
         int result = 0;
@@ -632,7 +637,7 @@ namespace os
       }
 
       int
-      uart::do_tcsendbreak (int duration)
+      uart_impl::do_tcsendbreak (int duration)
       {
         __HAL_UART_SEND_REQ(huart_, UART_SENDBREAK_REQUEST);
         while (__HAL_UART_GET_FLAG(huart_, UART_FLAG_SBKF))
@@ -640,8 +645,20 @@ namespace os
         return 0;
       }
 
+      int
+      uart_impl::do_vioctl (int request, std::va_list args)
+      {
+        return -1;
+      }
+
+      int
+      uart_impl::do_tcdrain (void)
+      {
+        return -1;      // TODO: implement
+      }
+
       void
-      uart::do_rs485_de (bool state)
+      uart_impl::do_rs485_de (bool state)
       {
         // do nothing, as the rs485 driver is normally enabled by the hardware.
       }
@@ -650,7 +667,7 @@ namespace os
        * @brief  Transmit event call-back.
        */
       void
-      uart::cb_tx_event (void)
+      uart_impl::cb_tx_event (void)
       {
         tx_sem_.post ();
 
@@ -662,7 +679,7 @@ namespace os
        * @brief  Receive event call-back. Here are reported receive errors too.
        */
       void
-      uart::cb_rx_event (bool half)
+      uart_impl::cb_rx_event (bool half)
       {
         size_t xfered;
         size_t half_buffer_size = rx_buff_size_ / 2;
