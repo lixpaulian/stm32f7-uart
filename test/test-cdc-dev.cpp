@@ -58,22 +58,41 @@ os::posix::file_descriptors_manager descriptors_manager
 // Note: both USB peripherals are instantiated to show how two DCD devices can
 // be implemented. However, in the example below only one peripheral is used.
 
-uart_cdc_dev cdc0
-  { "cdc0", DEVICE_FS, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE };
+// Explicit template instantiation.
+template class posix::tty_implementable<uart_cdc_dev>;
+using my_char = posix::tty_implementable<uart_cdc_dev>;
 
-uart_cdc_dev cdc1
-  { "cdc1", DEVICE_HS, nullptr, nullptr, TX_BUFFER_SIZE, RX_BUFFER_SIZE };
+my_char cdc0
+  { "cdc0", (uint8_t) DEVICE_FS, nullptr, nullptr, (size_t) TX_BUFFER_SIZE, (size_t) RX_BUFFER_SIZE };
+
+my_char cdc1
+  { "cdc1", (uint8_t) DEVICE_HS, nullptr, nullptr, (size_t) TX_BUFFER_SIZE, (size_t) RX_BUFFER_SIZE };
+
+//class babu
+//{
+//public:
+//
+//  babu (void)
+//  {
+//    cdc1.impl ().config (DEVICE_HS, nullptr, nullptr, TX_BUFFER_SIZE,
+//                         RX_BUFFER_SIZE);
+//    cdc0.impl ().config (DEVICE_FS, nullptr, nullptr, TX_BUFFER_SIZE,
+//                         RX_BUFFER_SIZE);
+//  }
+//} ;
+
+//babu my_babu;
 
 int8_t
 cdc_init (USBD_HandleTypeDef* husbd)
 {
   if (husbd->id == DEVICE_FS)
     {
-      return cdc0.cb_init_event ();
+      return cdc0.impl ().cb_init_event ();
     }
   if (husbd->id == DEVICE_HS)
     {
-      return cdc1.cb_init_event ();
+      return cdc1.impl ().cb_init_event ();
     }
   return USBD_OK;
 }
@@ -83,11 +102,11 @@ cdc_deinit (USBD_HandleTypeDef* husbd)
 {
   if (husbd->id == DEVICE_FS)
     {
-      return cdc0.cb_deinit_event ();
+      return cdc0.impl ().cb_deinit_event ();
     }
   if (husbd->id == DEVICE_HS)
     {
-      return cdc1.cb_deinit_event ();
+      return cdc1.impl ().cb_deinit_event ();
     }
   return USBD_OK;
 }
@@ -98,11 +117,11 @@ cdc_control (USBD_HandleTypeDef* husbd, uint8_t cmd, uint8_t* pbuf,
 {
   if (husbd->id == DEVICE_FS)
     {
-      return cdc0.cb_control_event (cmd, pbuf, length);
+      return cdc0.impl ().cb_control_event (cmd, pbuf, length);
     }
   if (husbd->id == DEVICE_HS)
     {
-      return cdc1.cb_control_event (cmd, pbuf, length);
+      return cdc1.impl ().cb_control_event (cmd, pbuf, length);
     }
   return USBD_OK;
 }
@@ -112,11 +131,11 @@ cdc_receive (USBD_HandleTypeDef* husbd, uint8_t* buf, uint32_t *len)
 {
   if (husbd->id == DEVICE_FS)
     {
-      return cdc0.cb_receive_event (buf, len);
+      return cdc0.impl ().cb_receive_event (buf, len);
     }
   if (husbd->id == DEVICE_HS)
     {
-      return cdc1.cb_receive_event (buf, len);
+      return cdc1.impl ().cb_receive_event (buf, len);
     }
   return USBD_OK;
 }
@@ -132,6 +151,9 @@ test_uart_cdc (void)
   char buffer[520];
 
   os::posix::tty* tty;
+
+  cdc1.impl ().config (DEVICE_HS, nullptr, nullptr, TX_BUFFER_SIZE,
+                       RX_BUFFER_SIZE);
 
   while (1)
     {
