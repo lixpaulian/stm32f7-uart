@@ -1,7 +1,7 @@
 /*
  * uart-drv.h
  *
- * Copyright (c) 2017 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2017, 2018 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -155,8 +155,8 @@ namespace os
         virtual int
         do_tcdrain (void) override;
 
-        static constexpr uint8_t UART_DRV_VERSION_MAJOR = 1;
-        static constexpr uint8_t UART_DRV_VERSION_MINOR = 31;
+        static constexpr uint8_t UART_DRV_VERSION_MAJOR = 2;
+        static constexpr uint8_t UART_DRV_VERSION_MINOR = 0;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;
