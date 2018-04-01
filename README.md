@@ -9,7 +9,7 @@ The drivers are fully functional, but several features are still missing (and th
 * The `fcntl` call
 * The USB DCD driver lacks control commands (Baudrate, Stop Bits, CTS/DTR control, etc.); this is however useful only in applications where a Virtual Com Port connects to an UART.
 
-The driver's API is conceived in a way to be easily integrated in a POSIX environment. It is derived from the `device_char` class found in µOS++.
+The driver's API is conceived in a way to be easily integrated in a POSIX environment. Since version 2.0 of the UART driver and 0.7 of the UART CDC driver, the API has been changed for a better integration with the POSIX layer of uOS++. Both drivers are implementations of uOS++ character devices.
 
 The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that starting with version 6.3.13 Liviu added initial support for `termios` and friends in µOS++ (see the test example).
 
@@ -51,11 +51,11 @@ If the DE pin used is not the one defined by the STM32F7xx hardware, you can der
 
 The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, in the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored, whereas a custom implementation may/should use it. Such a custom function would probably reconfigure the UART's TxD pin as output port, then switch it low, wait for the specified amount of time in a uOS++ delay function, switch the port high and finally reconfigure the pin as TxD.
 
-Note that the current VCP implementation does not support  the `tcsendbreak()` call.
+Note that the current VCP implementation does not support the `tcsendbreak()` call.
 
 ## Version
-* UART 1.31 (26 January 2018)
-* VCP 0.6 (26 January 2018)
+* UART 2.0 (1 April 2018)
+* VCP 0.7 (1 April 2018)
 
 ## License
 * MIT
@@ -65,7 +65,7 @@ The driver is provided as an XPACK and can be installed in an Eclipse based proj
 
 ## Dependencies
 The driver depends on the following software package:
-* uOS++ (https://github.com/micro-os-plus/micro-os-plus-iii)
+* uOS++ (https://github.com/micro-os-plus/micro-os-plus-iii), version 6.3.14 and up.
 
 In addition, you need the ST HAL, CMSIS and (if you use the USB DCD Device driver) the ST "Middleware".
 
