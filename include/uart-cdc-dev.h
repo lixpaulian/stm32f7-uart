@@ -133,7 +133,7 @@ namespace os
         do_tcdrain (void) override;
 
         static constexpr uint8_t VERSION_MAJOR = 0;
-        static constexpr uint8_t VERSION_MINOR = 6;
+        static constexpr uint8_t VERSION_MINOR = 7;
 
         uint8_t usb_id_;
         uint8_t* cdc_buff_;
