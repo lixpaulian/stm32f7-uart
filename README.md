@@ -54,8 +54,8 @@ The hardware generated break by the STM32F7xx family of controllers is only one 
 Note that the current VCP implementation does not support the `tcsendbreak()` call.
 
 ## Version
-* UART 2.0 (1 April 2018)
-* VCP 0.7 (1 April 2018)
+* UART 2.10 (12 April 2018)
+* VCP 0.8 (12 April 2018)
 
 ## License
 * MIT
