@@ -51,21 +51,18 @@ namespace os
   {
     namespace stm32f7
     {
-      uart_impl::uart_impl (posix::tty& self, UART_HandleTypeDef* huart,
-                            uint8_t* tx_buff, uint8_t* rx_buff,
-                            size_t tx_buff_size, size_t rx_buff_size) :
+      uart_impl::uart_impl (UART_HandleTypeDef* huart, uint8_t* tx_buff,
+                            uint8_t* rx_buff, size_t tx_buff_size,
+                            size_t rx_buff_size) :
           uart_impl
-            { self, huart, tx_buff, rx_buff, tx_buff_size, rx_buff_size, 0 } //
+            { huart, tx_buff, rx_buff, tx_buff_size, rx_buff_size, 0 } //
       {
         ;
       }
 
-      uart_impl::uart_impl (posix::tty& self, UART_HandleTypeDef* huart,
-                            uint8_t* tx_buff, uint8_t* rx_buff,
-                            size_t tx_buff_size, size_t rx_buff_size,
-                            uint32_t rs485_params) : //
-          tty_impl
-            { self }, //
+      uart_impl::uart_impl (UART_HandleTypeDef* huart, uint8_t* tx_buff,
+                            uint8_t* rx_buff, size_t tx_buff_size,
+                            size_t rx_buff_size, uint32_t rs485_params) : //
           huart_
             { huart }, //
           tx_buff_

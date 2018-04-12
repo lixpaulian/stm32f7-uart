@@ -48,11 +48,10 @@ namespace os
     {
       class uart_cdc_dev : public os::posix::tty_impl
       {
-
       public:
 
-        uart_cdc_dev (posix::tty& self, uint8_t usb_id, uint8_t* tx_buff,
-                  uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
+        uart_cdc_dev (uint8_t usb_id, uint8_t* tx_buff, uint8_t* rx_buff,
+                      size_t tx_buff_size, size_t rx_buff_size);
 
         uart_cdc_dev (const uart_cdc_dev&) = delete;
 
@@ -68,8 +67,8 @@ namespace os
         ~uart_cdc_dev () noexcept;
 
         void
-        config (uint8_t usb_id, uint8_t* tx_buff,
-                  uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
+        config (uint8_t usb_id, uint8_t* tx_buff, uint8_t* rx_buff,
+                size_t tx_buff_size, size_t rx_buff_size);
 
         void
         get_version (uint8_t& version_major, uint8_t& version_minor);
@@ -133,7 +132,7 @@ namespace os
         do_tcdrain (void) override;
 
         static constexpr uint8_t VERSION_MAJOR = 0;
-        static constexpr uint8_t VERSION_MINOR = 7;
+        static constexpr uint8_t VERSION_MINOR = 8;
 
         uint8_t usb_id_;
         uint8_t* cdc_buff_;

@@ -35,7 +35,6 @@
 #include <cmsis-plus/posix/termios.h>
 #include <fcntl.h>
 
-
 #if defined (__cplusplus)
 
 namespace os
@@ -77,11 +76,11 @@ namespace os
         static constexpr uint32_t RS485_DE_DEASSERT_TIME_MASK = (0x1F
             << RS485_DE_DEASSERT_TIME_POS);
 
-        uart_impl (posix::tty& self, UART_HandleTypeDef* huart,
+        uart_impl (UART_HandleTypeDef* huart,
                    uint8_t* tx_buff, uint8_t* rx_buff, size_t tx_buff_size,
                    size_t rx_buff_size);
 
-        uart_impl (posix::tty& self, UART_HandleTypeDef* huart,
+        uart_impl (UART_HandleTypeDef* huart,
                    uint8_t* tx_buff, uint8_t* rx_buff, size_t tx_buff_size,
                    size_t rx_buff_size, uint32_t rs485_params);
 
@@ -156,7 +155,7 @@ namespace os
         do_tcdrain (void) override;
 
         static constexpr uint8_t UART_DRV_VERSION_MAJOR = 2;
-        static constexpr uint8_t UART_DRV_VERSION_MINOR = 0;
+        static constexpr uint8_t UART_DRV_VERSION_MINOR = 10;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;

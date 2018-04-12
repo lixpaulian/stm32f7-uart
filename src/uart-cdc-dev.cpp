@@ -43,11 +43,9 @@ namespace os
     namespace stm32f7
     {
 
-      uart_cdc_dev::uart_cdc_dev (posix::tty& self, uint8_t usb_id,
-                                  uint8_t* tx_buff, uint8_t* rx_buff,
-                                  size_t tx_buff_size, size_t rx_buff_size) : //
-          tty_impl
-            { self }, //
+      uart_cdc_dev::uart_cdc_dev (uint8_t usb_id, uint8_t* tx_buff,
+                                  uint8_t* rx_buff, size_t tx_buff_size,
+                                  size_t rx_buff_size) : //
           usb_id_
             { usb_id }, //
           tx_buff_
@@ -523,7 +521,6 @@ namespace os
       {
         return -1;      // TODO: implement
       }
-
 
 // --------------------------------------------------------------------
 
