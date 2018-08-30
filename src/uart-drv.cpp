@@ -297,7 +297,7 @@ namespace os
         uint8_t* lbuf = (uint8_t *) buf;
         ssize_t count = 0;
 
-        os::rtos::clock::duration_t timeout =
+        rtos::clock::duration_t timeout =
             o_nonblock_ ? 0 : (cc_vmin_ > 0) ? 0xFFFFFFFF : rx_timeout_;
 
         uint32_t last_count =
@@ -318,7 +318,7 @@ namespace os
                     return -1;  // an error was reported, exit
                   }
 
-                if (rx_sem_.timed_wait (timeout) != os::rtos::result::ok)
+                if (rx_sem_.timed_wait (timeout) != rtos::result::ok)
                   {
                     if (last_count
                         == (huart_->hdmarx == nullptr ?
@@ -336,18 +336,23 @@ namespace os
               }
 
             // retrieve accumulated chars, if any
-            while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
               {
-                // we mask potential parity bit as HAL doesn't do it on DMA transfers
-                *lbuf++ = rx_buff_[rx_out_++] & huart_->Mask;
-                if (++count == 1)
+                while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
                   {
-                    // VMIN > 0, apply timeout (can be infinitum too)
-                    timeout = rx_timeout_;
-                  }
-                if (rx_out_ >= rx_buff_size_)
-                  {
-                    rx_out_ = 0;
+                    rtos::interrupts::critical_section ics;     // critical section
+
+                    // we mask potential parity bit as HAL doesn't do
+                    // it on DMA transfers
+                    *lbuf++ = rx_buff_[rx_out_++] & huart_->Mask;
+                    if (++count == 1)
+                      {
+                        // VMIN > 0, apply timeout (can be infinitum too)
+                        timeout = rx_timeout_;
+                      }
+                    if (rx_out_ >= rx_buff_size_)
+                      {
+                        rx_out_ = 0;
+                      }
                   }
               }
             if (count >= (ssize_t) nbyte)
