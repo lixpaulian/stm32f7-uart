@@ -155,7 +155,7 @@ namespace os
         do_tcdrain (void) override;
 
         static constexpr uint8_t UART_DRV_VERSION_MAJOR = 2;
-        static constexpr uint8_t UART_DRV_VERSION_MINOR = 10;
+        static constexpr uint8_t UART_DRV_VERSION_MINOR = 11;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;
