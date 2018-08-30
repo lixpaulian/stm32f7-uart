@@ -231,8 +231,9 @@ namespace os
       {
         uint8_t* lbuf = (uint8_t *) buf;
         ssize_t count = 0;
+        bool timeout_exit = false;
 
-        os::rtos::clock::duration_t timeout =
+        rtos::clock::duration_t timeout =
             o_nonblock_ ? 0 : (cc_vmin_ > 0) ? 0xFFFFFFFF : rx_timeout_;
 
         uint32_t last_count = rx_in_;
@@ -241,12 +242,13 @@ namespace os
           {
             while (rx_out_ == rx_in_)
               {
-                if (rx_sem_.timed_wait (timeout) != os::rtos::result::ok)
+                if (rx_sem_.timed_wait (timeout) != rtos::result::ok)
                   {
                     if (last_count == rx_in_)
                       {
                         // no more chars received: that means inter-char timeout
                         // return number of chars collected, if any
+                        timeout_exit = true;
                         break;
                       }
                     last_count = rx_in_;
@@ -260,20 +262,24 @@ namespace os
               }
 
             // retrieve accumulated chars, if any
-            while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
               {
-                *lbuf++ = rx_buff_[rx_out_++];
-                if (++count == 1)
+                rtos::interrupts::critical_section ics; // critical section
+
+                while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
                   {
-                    // VMIN > 0, apply timeout (can be infinitum too)
-                    timeout = rx_timeout_;
-                  }
-                if (rx_out_ >= rx_buff_size_)
-                  {
-                    rx_out_ = 0;
+                    *lbuf++ = rx_buff_[rx_out_++];
+                    if (++count == 1)
+                      {
+                        // VMIN > 0, apply timeout (can be infinitum too)
+                        timeout = rx_timeout_;
+                      }
+                    if (rx_out_ >= rx_buff_size_)
+                      {
+                        rx_out_ = 0;
+                      }
                   }
               }
-            if (count >= (ssize_t) nbyte)
+            if (count >= (ssize_t) nbyte || timeout_exit)
               {
                 break;
               }
@@ -309,7 +315,7 @@ namespace os
             while (pcd->TxState != 0)
               {
                 // busy, wait one tick
-                os::rtos::sysclock.sleep_for (1);
+                rtos::sysclock.sleep_for (1);
               }
 
             memcpy (tx_buff_, p + total,
@@ -345,7 +351,7 @@ namespace os
             while (pcd->TxState != 0)
               {
                 // busy, wait one tick
-                os::rtos::sysclock.sleep_for (1);
+                rtos::sysclock.sleep_for (1);
               }
             USBD_CDC_SetTxBuffer (husbd_, tx_buff_, 0);
             USBD_CDC_TransmitPacket (husbd_);
