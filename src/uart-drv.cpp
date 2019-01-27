@@ -1,7 +1,7 @@
 /*
  * usart-drv.cpp
  *
- * Copyright (c) 2017, 2018 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2017-2019 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -401,7 +401,7 @@ namespace os
 
         if (result != HAL_OK)
           {
-            count = 0;
+            count = -1;
             switch (result)
               {
               case HAL_BUSY:
