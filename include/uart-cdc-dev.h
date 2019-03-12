@@ -1,7 +1,7 @@
 /*
  * uart-cdc-dev.h
  *
- * Copyright (c) 2018 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2018, 2019 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -132,7 +132,9 @@ namespace os
         do_tcdrain (void) override;
 
         static constexpr uint8_t VERSION_MAJOR = 0;
-        static constexpr uint8_t VERSION_MINOR = 9;
+        static constexpr uint8_t VERSION_MINOR = 10;
+
+        static constexpr os::rtos::clock::duration_t open_timeout = 5000;
 
         uint8_t usb_id_;
         uint8_t* cdc_buff_;

@@ -1,7 +1,7 @@
 /*
  * uart-cdc-dev.cpp
  *
- * Copyright (c) 2018 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2018, 2019 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -105,6 +105,13 @@ namespace os
                 break;
               }
 
+            // wait for the usb device initialization to complete
+            if (init_sem_.timed_wait (open_timeout) != rtos::result::ok)
+              {
+                errno = EIO;
+                break;
+              }
+
             // if no rx/tx static buffers supplied, create them dynamically
             if (tx_buff_ == nullptr)
               {
@@ -156,9 +163,6 @@ namespace os
                 rx_timeout_ = 0xFFFFFFFF;
                 o_nonblock_ = false;
               }
-
-            // wait for the usb device initialization to complete
-            init_sem_.wait ();
 
             if ((cdc_buff_ = new uint8_t[packet_size_]) == nullptr)
               {
