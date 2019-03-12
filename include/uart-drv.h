@@ -1,7 +1,7 @@
 /*
  * uart-drv.h
  *
- * Copyright (c) 2017, 2018 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2017-2019 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -76,13 +76,12 @@ namespace os
         static constexpr uint32_t RS485_DE_DEASSERT_TIME_MASK = (0x1F
             << RS485_DE_DEASSERT_TIME_POS);
 
-        uart_impl (UART_HandleTypeDef* huart,
-                   uint8_t* tx_buff, uint8_t* rx_buff, size_t tx_buff_size,
-                   size_t rx_buff_size);
+        uart_impl (UART_HandleTypeDef* huart, uint8_t* tx_buff,
+                   uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size);
 
-        uart_impl (UART_HandleTypeDef* huart,
-                   uint8_t* tx_buff, uint8_t* rx_buff, size_t tx_buff_size,
-                   size_t rx_buff_size, uint32_t rs485_params);
+        uart_impl (UART_HandleTypeDef* huart, uint8_t* tx_buff,
+                   uint8_t* rx_buff, size_t tx_buff_size, size_t rx_buff_size,
+                   uint32_t rs485_params);
 
         uart_impl (const uart_impl&) = delete;
 
@@ -101,6 +100,9 @@ namespace os
         get_version (uint8_t& version_major, uint8_t& version_minor);
 
         // driver specific, not inherited functions
+        virtual void
+        termination (bool new_state);
+
         void
         cb_tx_event (void);
 
@@ -155,7 +157,7 @@ namespace os
         do_tcdrain (void) override;
 
         static constexpr uint8_t UART_DRV_VERSION_MAJOR = 2;
-        static constexpr uint8_t UART_DRV_VERSION_MINOR = 11;
+        static constexpr uint8_t UART_DRV_VERSION_MINOR = 12;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;

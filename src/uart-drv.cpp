@@ -660,6 +660,12 @@ namespace os
       }
 
       void
+      uart_impl::termination (bool new_state)
+      {
+
+      }
+
+      void
       uart_impl::do_rs485_de (bool state)
       {
         // do nothing, as the rs485 driver is normally enabled by the hardware.
