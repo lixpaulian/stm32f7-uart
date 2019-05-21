@@ -339,7 +339,7 @@ namespace os
               {
                 while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
                   {
-                    rtos::interrupts::critical_section ics;     // critical section
+                    rtos::interrupts::critical_section ics;  // critical section
 
                     // we mask potential parity bit as HAL doesn't do
                     // it on DMA transfers
@@ -478,7 +478,7 @@ namespace os
       int
       uart_impl::do_tcsetattr (int options, const struct termios *ptio)
       {
-        HAL_StatusTypeDef result;
+        bool reinit = false;
 
         // ST UARTs support only CS7 and CS8
         if ((ptio->c_cflag & CSIZE) < CS7 || options > TCIOFLUSH)
@@ -488,38 +488,60 @@ namespace os
           }
 
         // set parity
-        huart_->Init.Parity =
+        uint32_t temp32 =
             ptio->c_cflag & PARENB ?
                 (ptio->c_cflag & PARODD ? UART_PARITY_ODD : UART_PARITY_EVEN) :
                 UART_PARITY_NONE;
+        if (temp32 != huart_->Init.Parity)
+          {
+            huart_->Init.Parity = temp32;
+            reinit = true;
+          }
 
         // set character size
         if (huart_->Init.Parity == UART_PARITY_NONE)
           {
             // ST UARTs can't do 6 and 5 bit characters, only 7, 8 and 9
-            huart_->Init.WordLength = (ptio->c_cflag & CSIZE) == CS8 ? //
+            temp32 = (ptio->c_cflag & CSIZE) == CS8 ? //
                 UART_WORDLENGTH_8B : UART_WORDLENGTH_7B;
           }
         else
           {
-            huart_->Init.WordLength = (ptio->c_cflag & CSIZE) == CS8 ? //
+            temp32 = (ptio->c_cflag & CSIZE) == CS8 ? //
                 UART_WORDLENGTH_9B : UART_WORDLENGTH_8B;
+          }
+        if (temp32 != huart_->Init.WordLength)
+          {
+            huart_->Init.WordLength = temp32;
+            reinit = true;
           }
 
         // set number of stop bits
-        huart_->Init.StopBits =
-            ptio->c_cflag & CSTOPB ? UART_STOPBITS_2 : UART_STOPBITS_1;
+        temp32 = ptio->c_cflag & CSTOPB ? UART_STOPBITS_2 : UART_STOPBITS_1;
+        if (temp32 != huart_->Init.StopBits)
+          {
+            huart_->Init.StopBits = temp32;
+            reinit = true;
+          }
 
         // set hardware flow control
-        huart_->Init.HwFlowCtl =
-            (ptio->c_cflag & CRTSCTS) == CRTSCTS ? UART_HWCONTROL_RTS_CTS :
-            (ptio->c_cflag & CRTSCTS) == CRTS_IFLOW ? UART_HWCONTROL_RTS :
-            (ptio->c_cflag & CRTSCTS) == CCTS_OFLOW ? UART_HWCONTROL_CTS :
-            UART_HWCONTROL_NONE;
+        temp32 = (ptio->c_cflag & CRTSCTS) == CRTSCTS ? UART_HWCONTROL_RTS_CTS :
+                 (ptio->c_cflag & CRTSCTS) == CRTS_IFLOW ? UART_HWCONTROL_RTS :
+                 (ptio->c_cflag & CRTSCTS) == CCTS_OFLOW ? UART_HWCONTROL_CTS :
+                 UART_HWCONTROL_NONE;
+        if (temp32 != huart_->Init.HwFlowCtl)
+          {
+            huart_->Init.HwFlowCtl = temp32;
+            reinit = true;
+          }
 
         // set baud rate TODO: should we really close the port if baud rate is 0?
-        huart_->Init.BaudRate =
-            ptio->c_ispeed ? ptio->c_ispeed : ptio->c_ospeed;
+        temp32 = ptio->c_ispeed ? ptio->c_ispeed : ptio->c_ospeed;
+        if (temp32 != huart_->Init.BaudRate)
+          {
+            huart_->Init.BaudRate = temp32;
+            reinit = true;
+          }
 
         cc_vmin_ = ptio->c_cc[VMIN];
         cc_vtime_ = ptio->c_cc[VTIME];
@@ -561,26 +583,44 @@ namespace os
               }
           }
 
-        // before sending the new configuration, stop the UART
-        __HAL_UART_DISABLE(huart_);
-
-        // send configuration and restart UART
-        result = UART_SetConfig (huart_);
-        __HAL_UART_ENABLE(huart_);
-
-        if (result != HAL_OK)
+        if (reinit)
           {
-            switch (result)
-              {
-              case HAL_BUSY:
-                errno = EBUSY;
-                break;
+            // before sending the new configuration, stop the UART
+            __HAL_UART_DISABLE(huart_);
 
-              default:
-                errno = EINVAL;
-                break;
+            // send configuration and restart UART
+            HAL_StatusTypeDef result = UART_SetConfig (huart_);
+            if (result == HAL_OK)
+              {
+                if (huart_->hdmarx == nullptr)
+                  {
+                    // enable receive through UART interrupt transfers
+                    result = HAL_UART_Receive_IT (huart_, rx_buff_,
+                                                  rx_buff_size_ / 2);
+                  }
+                else
+                  {
+                    // enable receive through DMA transfers
+                    result = HAL_UART_Receive_DMA (huart_, rx_buff_,
+                                                   rx_buff_size_);
+                  }
               }
-            return -1;
+            __HAL_UART_ENABLE(huart_);
+
+            if (result != HAL_OK)
+              {
+                switch (result)
+                  {
+                  case HAL_BUSY:
+                    errno = EBUSY;
+                    break;
+
+                  default:
+                    errno = EINVAL;
+                    break;
+                  }
+                return -1;
+              }
           }
 
         return 0;
