@@ -585,27 +585,32 @@ namespace os
 
         if (reinit)
           {
-            // before sending the new configuration, stop the UART
-            __HAL_UART_DISABLE(huart_);
+            HAL_StatusTypeDef result;
 
-            // send configuration and restart UART
-            HAL_StatusTypeDef result = UART_SetConfig (huart_);
-            if (result == HAL_OK)
+            if ((result = HAL_UART_Abort (huart_)) == HAL_OK)
               {
-                if (huart_->hdmarx == nullptr)
+                // before sending the new configuration, stop the UART
+                __HAL_UART_DISABLE(huart_);
+
+                // send configuration and restart UART
+                result = UART_SetConfig (huart_);
+                if (result == HAL_OK)
                   {
-                    // enable receive through UART interrupt transfers
-                    result = HAL_UART_Receive_IT (huart_, rx_buff_,
-                                                  rx_buff_size_ / 2);
+                    if (huart_->hdmarx == nullptr)
+                      {
+                        // enable receive through UART interrupt transfers
+                        result = HAL_UART_Receive_IT (huart_, rx_buff_,
+                                                      rx_buff_size_ / 2);
+                      }
+                    else
+                      {
+                        // enable receive through DMA transfers
+                        result = HAL_UART_Receive_DMA (huart_, rx_buff_,
+                                                       rx_buff_size_);
+                      }
                   }
-                else
-                  {
-                    // enable receive through DMA transfers
-                    result = HAL_UART_Receive_DMA (huart_, rx_buff_,
-                                                   rx_buff_size_);
-                  }
+                __HAL_UART_ENABLE(huart_);
               }
-            __HAL_UART_ENABLE(huart_);
 
             if (result != HAL_OK)
               {
