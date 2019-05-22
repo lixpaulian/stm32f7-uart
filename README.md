@@ -54,7 +54,7 @@ The hardware generated break by the STM32F7xx family of controllers is only one 
 Note that the current VCP implementation does not support the `tcsendbreak()` call.
 
 ## Version
-* UART 2.13 (13 May 2019)
+* UART 2.14 (22 May 2019)
 * VCP 0.10 (12 March 2019)
 
 ## License
@@ -67,7 +67,7 @@ The driver is provided as an XPACK and can be installed in an Eclipse based proj
 The driver depends on the following software package:
 * uOS++ (https://github.com/micro-os-plus/micro-os-plus-iii), version 6.3.14 and up.
 
-In addition, you need the ST HAL, CMSIS and (if you use the USB DCD Device driver) the ST "Middleware".
+In addition, you need the ST HAL, CMSIS and (if you use the USB DCD Device driver) the ST "Middleware". The driver is compatible with STM32F7 HAL up to version 1.15.0.
 
 Note that the hardware initialisations (uController clock, peripherals clocks, etc.) must be separately performed, normaly in, or called from the `initialize_hardware.c` file of a gnuarmeclipse project. Alternatively you can do this using the CubeMX generator from ST. You may find helpful to check the following projects as references:
 * https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus
