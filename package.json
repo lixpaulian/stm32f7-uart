@@ -1,6 +1,6 @@
 {
   "name": "@lix/stm32f7-uart",
-  "version": "2.14",
+  "version": "2.1.5",
   "description": "µOS++ UART drivers for the STM32F7xx family of controllers",
   "author": {
     "name": "Lix N. Paulian",

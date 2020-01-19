@@ -1,7 +1,7 @@
 /*
  * uart-cdc-dev.h
  *
- * Copyright (c) 2018, 2019 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2018-2020 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -70,9 +70,6 @@ namespace os
         config (uint8_t usb_id, uint8_t* tx_buff, uint8_t* rx_buff,
                 size_t tx_buff_size, size_t rx_buff_size);
 
-        void
-        get_version (uint8_t& version_major, uint8_t& version_minor);
-
         // driver specific, not inherited functions
 
         int8_t
@@ -85,7 +82,7 @@ namespace os
         cb_control_event (uint8_t cmd, uint8_t* pbuf, uint16_t len);
 
         int8_t
-        cb_receive_event (uint8_t* pbuf, uint32_t *len);
+        cb_receive_event (uint8_t* pbuf, uint32_t* len);
 
 // --------------------------------------------------------------------
 
@@ -117,10 +114,10 @@ namespace os
         do_is_connected (void) override;
 
         virtual int
-        do_tcgetattr (struct termios *ptio) override;
+        do_tcgetattr (struct termios* ptio) override;
 
         virtual int
-        do_tcsetattr (int options, const struct termios *ptio) override;
+        do_tcsetattr (int options, const struct termios* ptio) override;
 
         virtual int
         do_tcflush (int queue_selector) override;
@@ -130,9 +127,6 @@ namespace os
 
         virtual int
         do_tcdrain (void) override;
-
-        static constexpr uint8_t VERSION_MAJOR = 0;
-        static constexpr uint8_t VERSION_MINOR = 10;
 
         static constexpr os::rtos::clock::duration_t open_timeout = 5000;
 
@@ -170,17 +164,6 @@ namespace os
 
       };
 
-      /**
-       * @brief  Return the version of the driver.
-       * @param  version_major: major version.
-       * @param  version_minor: minor version.
-       */
-      inline void
-      uart_cdc_dev::get_version (uint8_t& version_major, uint8_t& version_minor)
-      {
-        version_major = VERSION_MAJOR;
-        version_minor = VERSION_MINOR;
-      }
     } /* namespace stm32f7 */
   } /* namespace driver */
 } /* namespace os */

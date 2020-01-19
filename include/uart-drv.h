@@ -1,7 +1,7 @@
 /*
  * uart-drv.h
  *
- * Copyright (c) 2017-2019 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2017-2020 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -97,7 +97,8 @@ namespace os
         ~uart_impl () noexcept;
 
         void
-        get_version (uint8_t& version_major, uint8_t& version_minor);
+        get_version (uint8_t& version_major, uint8_t& version_minor,
+                     uint8_t& version_patch);
 
         // driver specific, not inherited functions
         virtual void
@@ -142,10 +143,10 @@ namespace os
         do_is_connected (void) override;
 
         virtual int
-        do_tcgetattr (struct termios *ptio) override;
+        do_tcgetattr (struct termios* ptio) override;
 
         virtual int
-        do_tcsetattr (int options, const struct termios *ptio) override;
+        do_tcsetattr (int options, const struct termios* ptio) override;
 
         virtual int
         do_tcflush (int queue_selector) override;
@@ -156,8 +157,9 @@ namespace os
         virtual int
         do_tcdrain (void) override;
 
-        static constexpr uint8_t UART_DRV_VERSION_MAJOR = 2;
-        static constexpr uint8_t UART_DRV_VERSION_MINOR = 14;
+        static constexpr uint8_t VERSION_MAJOR = 2;
+        static constexpr uint8_t VERSION_MINOR = 1;
+        static constexpr uint8_t VERSION_PATCH = 5;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;
@@ -200,10 +202,12 @@ namespace os
        * @param  version_minor: minor version.
        */
       inline void
-      uart_impl::get_version (uint8_t& version_major, uint8_t& version_minor)
+      uart_impl::get_version (uint8_t& version_major, uint8_t& version_minor,
+                              uint8_t& version_patch)
       {
-        version_major = UART_DRV_VERSION_MAJOR;
-        version_minor = UART_DRV_VERSION_MINOR;
+        version_major = VERSION_MAJOR;
+        version_minor = VERSION_MINOR;
+        version_patch = VERSION_PATCH;
       }
 
     } /* namespace stm32f7 */
