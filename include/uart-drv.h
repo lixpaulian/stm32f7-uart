@@ -120,6 +120,12 @@ namespace os
         virtual void
         do_rs485_de (bool state);
 
+        virtual void
+        open_hook (void);
+
+        virtual void
+        close_hook (void);
+
         // --------------------------------------------------------------------
 
       private:
@@ -159,7 +165,7 @@ namespace os
 
         static constexpr uint8_t VERSION_MAJOR = 2;
         static constexpr uint8_t VERSION_MINOR = 1;
-        static constexpr uint8_t VERSION_PATCH = 5;
+        static constexpr uint8_t VERSION_PATCH = 6;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;

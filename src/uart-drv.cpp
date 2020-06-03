@@ -247,6 +247,7 @@ namespace os
           }
         else
           {
+            open_hook ();
             is_opened_ = true;
             result = 0;
           }
@@ -286,6 +287,7 @@ namespace os
             rx_buff_ = nullptr;
           }
 
+        close_hook ();
         is_opened_ = false;
 
         return 0;
@@ -294,7 +296,7 @@ namespace os
       ssize_t
       uart_impl::do_read (void* buf, std::size_t nbyte)
       {
-        uint8_t* lbuf = (uint8_t *) buf;
+        uint8_t* lbuf = (uint8_t*) buf;
         ssize_t count = 0;
 
         rtos::clock::duration_t timeout =
@@ -388,9 +390,9 @@ namespace os
             // DMA transfer
             // clean the data cache to mitigate incoherence before DMA transfers
             // (all RAM except DTCM RAM is cached)
-            if ((tx_buff_ + tx_buff_size_) >= (uint8_t *) SRAM1_BASE)
+            if ((tx_buff_ + tx_buff_size_) >= (uint8_t*) SRAM1_BASE)
               {
-                uint32_t *aligned_buff = (uint32_t *) (((uint32_t) (tx_buff_))
+                uint32_t* aligned_buff = (uint32_t*) (((uint32_t) (tx_buff_))
                     & 0xFFFFFFE0);
                 uint32_t aligned_count = (uint32_t) (tx_buff_size_ & 0xFFFFFFE0)
                     + 32;
@@ -429,10 +431,10 @@ namespace os
       }
 
       int
-      uart_impl::do_tcgetattr (struct termios *ptio)
+      uart_impl::do_tcgetattr (struct termios* ptio)
       {
         // clear the termios structure
-        bzero ((void *) ptio, sizeof(struct termios));
+        memset ((void*) ptio, 0, sizeof(struct termios));
 
         // termios.h: CSIZE: CS5, CS6, CS7, CS8; ST can CS7 and CS8 only
         // note: ST uses a normal bit for parity, must be subtracted from total
@@ -476,7 +478,7 @@ namespace os
       }
 
       int
-      uart_impl::do_tcsetattr (int options, const struct termios *ptio)
+      uart_impl::do_tcsetattr (int options, const struct termios* ptio)
       {
         bool reinit = false;
 
@@ -716,6 +718,20 @@ namespace os
         // do nothing, as the rs485 driver is normally enabled by the hardware.
       }
 
+      void
+      uart_impl::open_hook (void)
+      {
+        // a derived driver class may call here specific functions dealing with
+        // the hardware (e.g. driver enable, etc).
+      }
+
+      void
+      uart_impl::close_hook (void)
+      {
+        // a derived driver class may call here specific functions dealing with
+        // the hardware (e.g. driver disable, etc).
+      }
+
       /**
        * @brief  Transmit event call-back.
        */
@@ -782,9 +798,9 @@ namespace os
             // for DMA transfer
             // flush and clean the data cache to mitigate incoherence after
             // DMA transfers (all but the DTCM RAM is cached)
-            if ((rx_buff_ + rx_buff_size_) >= (uint8_t *) SRAM1_BASE)
+            if ((rx_buff_ + rx_buff_size_) >= (uint8_t*) SRAM1_BASE)
               {
-                uint32_t *aligned_buff = (uint32_t *) (((uint32_t) (rx_buff_))
+                uint32_t* aligned_buff = (uint32_t*) (((uint32_t) (rx_buff_))
                     & 0xFFFFFFE0);
                 uint32_t aligned_count = (uint32_t) (rx_buff_size_ & 0xFFFFFFE0)
                     + 32;
