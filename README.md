@@ -54,7 +54,7 @@ The hardware generated break by the STM32F7xx family of controllers is only one 
 Note that the current VCP implementation does not support the `tcsendbreak()` call.
 
 ## Version
-* 2.1.5 (19 January 2020)
+* 2.1.6 (3 June 2020)
 
 ## License
 * MIT
