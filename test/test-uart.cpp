@@ -213,6 +213,7 @@ test_uart (void)
             }
         }
     }
+  trace::printf ("Test End\n");
 }
 
 /**
