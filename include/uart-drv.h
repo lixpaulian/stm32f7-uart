@@ -163,9 +163,15 @@ namespace os
         virtual int
         do_tcdrain (void) override;
 
+        void
+        invalidate_dcache (uint8_t* ptr, size_t len);
+
+        void
+        clean_dcache (uint8_t* ptr, size_t len);
+
         static constexpr uint8_t VERSION_MAJOR = 2;
         static constexpr uint8_t VERSION_MINOR = 1;
-        static constexpr uint8_t VERSION_PATCH = 6;
+        static constexpr uint8_t VERSION_PATCH = 7;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;
@@ -214,6 +220,22 @@ namespace os
         version_major = VERSION_MAJOR;
         version_minor = VERSION_MINOR;
         version_patch = VERSION_PATCH;
+      }
+
+      inline void
+      uart_impl::invalidate_dcache (uint8_t* ptr, size_t len)
+      {
+        uint32_t* aligned_buff = (uint32_t*) (((uint32_t) ptr) & 0xFFFFFFE0);
+        uint32_t aligned_count = (uint32_t) (len & 0xFFFFFFE0) + 32;
+        SCB_CleanInvalidateDCache_by_Addr (aligned_buff, aligned_count);
+      }
+
+      inline void
+      uart_impl::clean_dcache (uint8_t* ptr, size_t len)
+      {
+        uint32_t* aligned_buff = (uint32_t*) (((uint32_t) (ptr)) & 0xFFFFFFE0);
+        uint32_t aligned_count = (uint32_t) (len & 0xFFFFFFE0) + 32;
+        SCB_CleanDCache_by_Addr (aligned_buff, aligned_count);
       }
 
     } /* namespace stm32f7 */

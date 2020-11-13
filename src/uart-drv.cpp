@@ -213,6 +213,12 @@ namespace os
             else
               {
                 // enable receive through DMA transfers
+                // flush and clean the data cache to mitigate incoherence after
+                // DMA transfers (all but the DTCM RAM is cached if D-Cache is enabled)
+                if ((rx_buff_ + rx_buff_size_) >= (uint8_t*) SRAM1_BASE)
+                  {
+                    invalidate_dcache (rx_buff_, rx_buff_size_);
+                  }
                 hal_result = HAL_UART_Receive_DMA (huart_, rx_buff_,
                                                    rx_buff_size_);
               }
@@ -389,14 +395,10 @@ namespace os
           {
             // DMA transfer
             // clean the data cache to mitigate incoherence before DMA transfers
-            // (all RAM except DTCM RAM is cached)
+            // (all RAM except DTCM RAM is cached, if D-Cache is enabled)
             if ((tx_buff_ + tx_buff_size_) >= (uint8_t*) SRAM1_BASE)
               {
-                uint32_t* aligned_buff = (uint32_t*) (((uint32_t) (tx_buff_))
-                    & 0xFFFFFFE0);
-                uint32_t aligned_count = (uint32_t) (tx_buff_size_ & 0xFFFFFFE0)
-                    + 32;
-                SCB_CleanDCache_by_Addr (aligned_buff, aligned_count);
+                clean_dcache (tx_buff_, tx_buff_size_);
               }
             result = HAL_UART_Transmit_DMA (huart_, tx_buff_, count);
           }
@@ -795,19 +797,14 @@ namespace os
           }
         else
           {
+            // reload DMA receive
             // for DMA transfer
             // flush and clean the data cache to mitigate incoherence after
-            // DMA transfers (all but the DTCM RAM is cached)
+            // DMA transfers (all but the DTCM RAM is cached if D-Cache is enabled)
             if ((rx_buff_ + rx_buff_size_) >= (uint8_t*) SRAM1_BASE)
               {
-                uint32_t* aligned_buff = (uint32_t*) (((uint32_t) (rx_buff_))
-                    & 0xFFFFFFE0);
-                uint32_t aligned_count = (uint32_t) (rx_buff_size_ & 0xFFFFFFE0)
-                    + 32;
-                SCB_CleanInvalidateDCache_by_Addr (aligned_buff, aligned_count);
+                invalidate_dcache (rx_buff_, rx_buff_size_);
               }
-
-            // reload DMA receive
             if ((half == false && rx_in_ == 0)
                 || huart_->ErrorCode != HAL_UART_ERROR_NONE)
               {
