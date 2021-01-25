@@ -9,7 +9,7 @@ The drivers are fully functional, but several features are still missing (and th
 * The `fcntl` call
 * The USB DCD driver lacks control commands (Baudrate, Stop Bits, CTS/DTR control, etc.); this is however useful only in applications where a Virtual Com Port connects to an UART.
 
-The driver's API is conceived in a way to be easily integrated in a POSIX environment. Since version 2.0 of the UART driver and 0.7 of the UART CDC driver, the API has been changed for a better integration with the POSIX layer of uOS++. Both drivers are implementations of uOS++ character devices.
+The driver's API is conceived in a way to be easily integrated in a POSIX environment. Since version 2.0 of the UART driver and 0.7 of the UART CDC driver, the API has been changed for a better integration with the POSIX layer of µOS++. Both drivers are implementations of µOS++ character devices.
 
 The POSIX approach to configure a serial port is through the `struct termios` and its related API. Unfortunately, the standard newlib for embeded development does not include it. The good news is that starting with version 6.3.13 Liviu added initial support for `termios` and friends in µOS++ (see the test example).
 
@@ -49,7 +49,7 @@ The STM32F7xx hardware has its built-in method of handling the DE pin (driver en
 
 If the DE pin used is not the one defined by the STM32F7xx hardware, you can derive your own uart class and replace the function `void uart::do_rs485_de (bool state)`. The same applies for sending breaks: you may want to replace the function `int uart::do_tcsendbreak (int duration)` with your own. An example of such an approach can be seen in the SDI-12 Data Recorder library that makes use of this driver (https://github.com/lixpaulian/dacq).
 
-The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, in the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored, whereas a custom implementation may/should use it. Such a custom function would probably reconfigure the UART's TxD pin as output port, then switch it low, wait for the specified amount of time in a uOS++ delay function, switch the port high and finally reconfigure the pin as TxD.
+The hardware generated break by the STM32F7xx family of controllers is only one character long (consult the controller's Reference Manual), and for some applications it might be too short. Moreover, in the built-in function, the parameter `duration` of the `tcsendbreak ()` function is simply ignored, whereas a custom implementation may/should use it. Such a custom function would probably reconfigure the UART's TxD pin as output port, then switch it low, wait for the specified amount of time in a µOS++ delay function, switch the port high and finally reconfigure the pin as TxD.
 
 Note that the current VCP implementation does not support the `tcsendbreak()` call.
 
@@ -60,17 +60,17 @@ Note that the current VCP implementation does not support the `tcsendbreak()` ca
 * MIT
 
 ## Package
-The driver is provided as an XPACK and can be installed in an Eclipse based project using the attached script (however, the include and source paths must be manually added to the project in Eclipse). For more details on XPACKs see https://github.com/xpacks. The installation script requires the helper scripts that can be found at https://github.com/xpacks/scripts.
+The driver is provided as an xPack and can be installed in an Eclipse based project using the attached script (however, the include and source paths must be manually added to the project in Eclipse). For more details on xPacks see https://github.com/xpacks. The installation script requires the helper scripts that can be found at https://github.com/xpacks/scripts.
 
 ## Dependencies
 The driver depends on the following software package:
-* uOS++ (https://github.com/micro-os-plus/micro-os-plus-iii), version 6.3.14 and up.
+* µOS++ (https://github.com/micro-os-plus/micro-os-plus-iii), version 6.3.14 and up.
 
 In addition, you need the ST HAL, CMSIS and (if you use the USB DCD Device driver) the ST "Middleware". The driver is compatible with STM32F7 HAL up to version 1.15.0.
 
-Note that the hardware initialisations (uController clock, peripherals clocks, etc.) must be separately performed, normaly in, or called from the `initialize_hardware.c` file of a gnuarmeclipse project. Alternatively you can do this using the CubeMX generator from ST. You may find helpful to check the following projects as references:
+Note that the hardware initialisations (µController clock, peripherals clocks, etc.) must be separately performed, normaly in, or called from the `initialize_hardware.c` file of a gnuarmeclipse project. Alternatively you can do this using the CubeMX generator from ST. You may find helpful to check the following projects as references:
 * https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus
-* https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus/cube-mx which details how to integrate the CubeMX generated code into a uOS++ based project.
+* https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus/cube-mx which details how to integrate the CubeMX generated code into a µOS++ based project.
 
 ## UART Driver specifics
 If you use CubeMX to initialize the UART(s), you have two choices: either you let the CubeMX generated code to initialize the uart handle (as well as the UART itself) at startup, or you provide your own function to initialize only the uart handle, while the UART itself will be initialized by the driver. In the first case, you have to define the `UART_INITED_BY_CUBE_MX` symbol to `true` (by default it is set to `false`). The second solution is the preferred one. An example is given below, see the `USER CODE BEGIN 2` section  (from the CubeMX `main.c` generated file):
