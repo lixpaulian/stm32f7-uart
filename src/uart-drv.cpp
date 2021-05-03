@@ -1,7 +1,7 @@
 /*
  * usart-drv.cpp
  *
- * Copyright (c) 2017-2020 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2017-2021 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -308,9 +308,7 @@ namespace os
         rtos::clock::duration_t timeout =
             o_nonblock_ ? 0 : (cc_vmin_ > 0) ? 0xFFFFFFFF : rx_timeout_;
 
-        uint32_t last_count =
-            huart_->hdmarx == nullptr ?
-                huart_->RxXferCount : huart_->hdmarx->Instance->NDTR;
+        size_t last_count = get_current_count ();
 
         // compute mask for possible parity bit masking
         UART_MASK_COMPUTATION(huart_);
@@ -328,18 +326,13 @@ namespace os
 
                 if (rx_sem_.timed_wait (timeout) != rtos::result::ok)
                   {
-                    if (last_count
-                        == (huart_->hdmarx == nullptr ?
-                            huart_->RxXferCount : huart_->hdmarx->Instance->NDTR))
+                    if (last_count == get_current_count ())
                       {
                         // no more chars received: that means inter-char timeout,
                         // return number of chars collected, if any
                         break;
                       }
-                    last_count =
-                        huart_->hdmarx == nullptr ?
-                            huart_->RxXferCount :
-                            huart_->hdmarx->Instance->NDTR;
+                    last_count = get_current_count ();
                   }
               }
 
@@ -755,12 +748,6 @@ namespace os
         size_t xfered;
         size_t half_buffer_size = rx_buff_size_ / 2;
 
-        // handle errors (PE, FE, etc.), if any
-        if (huart_->ErrorCode != HAL_UART_ERROR_NONE)
-          {
-            is_error_ = true;
-          }
-
         // compute the number of chars received during the last transfer
         if (huart_->hdmarx == nullptr)
           {
@@ -786,8 +773,7 @@ namespace os
         if (huart_->hdmarx == nullptr)
           {
             // for non-DMA transfer
-            if (huart_->RxXferCount == 0 //
-            || huart_->ErrorCode != HAL_UART_ERROR_NONE)
+            if (huart_->RxXferCount == 0)
               {
                 HAL_UART_Receive_IT (
                     huart_,
@@ -798,19 +784,32 @@ namespace os
         else
           {
             // reload DMA receive
-            // for DMA transfer
             // flush and clean the data cache to mitigate incoherence after
             // DMA transfers (all but the DTCM RAM is cached if D-Cache is enabled)
             if ((rx_buff_ + rx_buff_size_) >= (uint8_t*) SRAM1_BASE)
               {
                 invalidate_dcache (rx_buff_, rx_buff_size_);
               }
-            if ((half == false && rx_in_ == 0)
-                || huart_->ErrorCode != HAL_UART_ERROR_NONE)
+            if (half == false && rx_in_ == 0)
               {
                 HAL_UART_Receive_DMA (huart_, rx_buff_, rx_buff_size_);
               }
           }
+
+        rx_sem_.post ();
+      }
+
+      /**
+       * @brief  Receive error event call-back.
+       */
+      void
+      uart_impl::cb_rx_event_error (void)
+      {
+        // handle errors (PE, FE, etc.)
+        is_error_ = true;
+
+        huart_->RxState = HAL_UART_STATE_READY;
+        rx_in_ = rx_out_ = 0;
 
         rx_sem_.post ();
       }
