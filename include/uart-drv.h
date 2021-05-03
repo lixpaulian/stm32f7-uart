@@ -1,7 +1,7 @@
 /*
  * uart-drv.h
  *
- * Copyright (c) 2017-2020 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2017-2021 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -110,6 +110,9 @@ namespace os
         void
         cb_rx_event (bool half);
 
+        void
+        cb_rx_event_error (void);
+
         // --------------------------------------------------------------------
 
       protected:
@@ -169,9 +172,12 @@ namespace os
         void
         clean_dcache (uint8_t* ptr, size_t len);
 
+        size_t
+        get_current_count (void);
+
         static constexpr uint8_t VERSION_MAJOR = 2;
-        static constexpr uint8_t VERSION_MINOR = 1;
-        static constexpr uint8_t VERSION_PATCH = 7;
+        static constexpr uint8_t VERSION_MINOR = 2;
+        static constexpr uint8_t VERSION_PATCH = 0;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;
@@ -236,6 +242,14 @@ namespace os
         uint32_t* aligned_buff = (uint32_t*) (((uint32_t) (ptr)) & 0xFFFFFFE0);
         uint32_t aligned_count = (uint32_t) (len & 0xFFFFFFE0) + 32;
         SCB_CleanDCache_by_Addr (aligned_buff, aligned_count);
+      }
+
+      inline size_t
+      uart_impl::get_current_count (void)
+      {
+        return
+            huart_->hdmarx == nullptr ?
+                huart_->RxXferCount : huart_->hdmarx->Instance->NDTR;
       }
 
     } /* namespace stm32f7 */
