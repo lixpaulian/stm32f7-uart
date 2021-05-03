@@ -45,7 +45,7 @@
 
 extern "C"
 {
-  UART_HandleTypeDef huart6;
+  extern UART_HandleTypeDef huart6;
 }
 
 using namespace os;
@@ -101,7 +101,7 @@ HAL_UART_ErrorCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == huart6.Instance)
     {
-      uart6.impl ().cb_rx_event (false);
+      uart6.impl ().cb_rx_event_error ();
     }
 }
 
