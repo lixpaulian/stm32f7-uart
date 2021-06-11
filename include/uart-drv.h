@@ -177,7 +177,7 @@ namespace os
 
         static constexpr uint8_t VERSION_MAJOR = 2;
         static constexpr uint8_t VERSION_MINOR = 2;
-        static constexpr uint8_t VERSION_PATCH = 0;
+        static constexpr uint8_t VERSION_PATCH = 1;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;
@@ -231,17 +231,26 @@ namespace os
       inline void
       uart_impl::invalidate_dcache (uint8_t* ptr, size_t len)
       {
-        uint32_t* aligned_buff = (uint32_t*) (((uint32_t) ptr) & 0xFFFFFFE0);
-        uint32_t aligned_count = (uint32_t) (len & 0xFFFFFFE0) + 32;
-        SCB_CleanInvalidateDCache_by_Addr (aligned_buff, aligned_count);
+        if (SCB->CCR & (uint32_t) SCB_CCR_DC_Msk)
+          {
+            // D-cache is enabled
+            uint32_t* aligned_buff = (uint32_t*) (((uint32_t) ptr) & 0xFFFFFFE0);
+            uint32_t aligned_count = (uint32_t) (len & 0xFFFFFFE0) + 32;
+            SCB_CleanInvalidateDCache_by_Addr (aligned_buff, aligned_count);
+          }
       }
 
       inline void
       uart_impl::clean_dcache (uint8_t* ptr, size_t len)
       {
-        uint32_t* aligned_buff = (uint32_t*) (((uint32_t) (ptr)) & 0xFFFFFFE0);
-        uint32_t aligned_count = (uint32_t) (len & 0xFFFFFFE0) + 32;
-        SCB_CleanDCache_by_Addr (aligned_buff, aligned_count);
+        if (SCB->CCR & (uint32_t) SCB_CCR_DC_Msk)
+          {
+            // D-cache is enabled
+            uint32_t* aligned_buff = (uint32_t*) (((uint32_t) (ptr))
+                & 0xFFFFFFE0);
+            uint32_t aligned_count = (uint32_t) (len & 0xFFFFFFE0) + 32;
+            SCB_CleanDCache_by_Addr (aligned_buff, aligned_count);
+          }
       }
 
       inline size_t
