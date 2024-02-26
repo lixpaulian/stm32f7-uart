@@ -1,3 +1,7 @@
+![GitHub package.json version](https://img.shields.io/github/package-json/v/lixpaulian/stm32f7-uart)
+![GitHub Tag](https://img.shields.io/github/v/tag/lixpaulian/stm32f7-uart)
+![GitHub License](https://img.shields.io/github/license/lixpaulian/stm32f7-uart)
+
 # stm32f7-uart
 µOS++ UART drivers for the STM32F7xx family of controllers.
 
@@ -53,24 +57,28 @@ The hardware generated break by the STM32F7xx family of controllers is only one 
 
 Note that the current VCP implementation does not support the `tcsendbreak()` call.
 
-## Version
-* 2.2.1 (June 11, 2021)
-
-## License
-* MIT
-
 ## Package
-The class is provided as an xPack (for more details on xPacks see https://xpack.github.io). It can be installed in an Eclipse based project using either `xpm` or the attached script (however, the include and source paths must be manually added to the project in Eclipse). Of course, it can be installed without using the xPacks tools, either from the repository or manually, but then updating it later might be more difficult.
+The class is provided as an **xPack** (for more details on xPacks see https://xpack.github.io). It can be installed in a project using either `xpm` or the attached script. Of course, it can be installed without using the xPacks tools, either by linking the class as a Git submodule or by copying it in your project, but then updating it later might be more difficult.
 
-Note thathe xPacks project evolved with the time. Initially it was based on shell scripts, but the current version is based on a set of utilities, in partcular `xpm` plus a json description file. This project supports both versions, therefore you will still find the `xpacks-helper.sh` script in the `scripts` subdirectory, as well as the `package.json` file for `xpm`. However, the script based version is deprecated and will not be supported in the future.
+Note that the xPacks project evolved with the time. Initially it was based on shell scripts, but the current version is based on a set of utilities, `xpm` and a JSON description file. You will still find the `xpacks-helper.sh` script in the `scripts` subdirectory, but it is not recommened as it is deprecated and will not be supported in the future. Instead use the procedure described below.
+
+To install the package using `xpm` you must make sure that you have already `nodejs` and `xpm` installed on your computer (see also [xPack install](https://xpack.github.io/install/)). Then, in your project directory issue the commands:
+
+```sh
+cd my-project
+xpm init # Add a package.json if not already present
+xpm install github:lixpaulian/stm32f7-uart#v2.2.1 --save-dev --copy
+```
+
+Note: Without `--copy`, the default is to create a link to a read-only instance of the package in the `xpm` central store.
 
 ## Dependencies
 The driver depends on the following software package:
 * µOS++ (https://github.com/micro-os-plus/micro-os-plus-iii), version 6.3.14 and up.
 
-In addition, you need the ST HAL, CMSIS and (if you use the USB DCD Device driver) the ST "Middleware". The driver is compatible with STM32F7 HAL up to version 1.15.0.
+In addition, you need the ST HAL, CMSIS and (if you use the USB DCD Device driver) the ST "Middleware". The driver is compatible with STM32F7 HAL up to version 1.17.0.
 
-Note that the hardware initialisations (µController clock, peripherals clocks, etc.) must be separately performed, normaly in, or called from the `initialize_hardware.c` file of a gnuarmeclipse project. Alternatively you can do this using the CubeMX generator from ST. You may find helpful to check the following projects as references:
+Note that the hardware initialisations (µController clock, peripherals clocks, etc.) must be separately performed, normaly in, or called from the `initialize_hardware.c` file of a GNU MCU Eclipse project. Alternatively you can do this using the CubeMX generator from ST (recommended, as the STM32xxx xPacks will probably be discontinued). You may find helpful to check the following projects as references:
 * https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus
 * https://github.com/micro-os-plus/eclipse-demo-projects/tree/master/f746gdiscovery-blinky-micro-os-plus/cube-mx which details how to integrate the CubeMX generated code into a µOS++ based project.
 
