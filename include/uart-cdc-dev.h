@@ -1,7 +1,7 @@
 /*
  * uart-cdc-dev.h
  *
- * Copyright (c) 2018-2020 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2018-2020, 2024 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation

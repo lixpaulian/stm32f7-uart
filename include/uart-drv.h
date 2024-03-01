@@ -1,7 +1,7 @@
 /*
  * uart-drv.h
  *
- * Copyright (c) 2017-2021 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2017-2021, 2024 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -177,7 +177,7 @@ namespace os
 
         static constexpr uint8_t VERSION_MAJOR = 2;
         static constexpr uint8_t VERSION_MINOR = 2;
-        static constexpr uint8_t VERSION_PATCH = 1;
+        static constexpr uint8_t VERSION_PATCH = 2;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;
