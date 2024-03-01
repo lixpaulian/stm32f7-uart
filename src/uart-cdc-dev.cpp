@@ -1,7 +1,7 @@
 /*
  * uart-cdc-dev.cpp
  *
- * Copyright (c) 2018-2020 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2018-2020, 2024 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -92,7 +92,8 @@ namespace os
               }
 
             // initialize FIFO
-            rx_in_ = rx_out_ = 0;
+            rx_in_ = 0;
+            rx_out_ = 0;
 
             // reset semaphores
             init_sem_.reset ();
@@ -271,7 +272,8 @@ namespace os
 
                 while (rx_out_ != rx_in_ && count < (ssize_t) nbyte)
                   {
-                    *lbuf++ = rx_buff_[rx_out_++];
+                    *lbuf++ = rx_buff_[rx_out_];
+                    rx_out_ = rx_out_ + 1;
                     if (++count == 1)
                       {
                         // VMIN > 0, apply timeout (can be infinitum too)
@@ -496,7 +498,8 @@ namespace os
             if (queue_selector & TCIFLUSH)
               {
                 rx_sem_.reset ();
-                rx_in_ = rx_out_ = 0;
+                rx_in_ = 0;
+                rx_out_ = 0;
                 last_packet_ = false;
               }
 
@@ -578,7 +581,8 @@ namespace os
 
         while (xfered--)
           {
-            rx_buff_[rx_in_++] = *pbuf++;
+            rx_buff_[rx_in_] = *pbuf++;
+            rx_in_ = rx_in_ + 1;
             if (rx_in_ >= rx_buff_size_)
               {
                 rx_in_ = 0;

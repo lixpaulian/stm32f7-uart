@@ -1,7 +1,7 @@
 /*
  * usart-drv.cpp
  *
- * Copyright (c) 2017-2021 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2017-2021, 2024 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -195,8 +195,10 @@ namespace os
               }
 
             // initialize FIFOs and semaphores
-            tx_in_ = tx_out_ = 0;
-            rx_in_ = rx_out_ = 0;
+            tx_in_ = 0;
+            tx_out_ = 0;
+            rx_in_ = 0;
+            rx_out_ = 0;
 
             // reset semaphores
             tx_sem_.reset ();
@@ -344,7 +346,8 @@ namespace os
 
                     // we mask potential parity bit as HAL doesn't do
                     // it on DMA transfers
-                    *lbuf++ = rx_buff_[rx_out_++] & huart_->Mask;
+                    *lbuf++ = rx_buff_[rx_out_] & huart_->Mask;
+                    rx_out_ = rx_out_ + 1;
                     if (++count == 1)
                       {
                         // VMIN > 0, apply timeout (can be infinitum too)
@@ -650,13 +653,15 @@ namespace os
               {
                 huart_->RxState = HAL_UART_STATE_READY;
                 rx_sem_.reset ();
-                rx_in_ = rx_out_ = 0;
+                rx_in_ = 0;
+                rx_out_ = 0;
               }
 
             if (queue_selector & TCOFLUSH)
               {
                 tx_sem_.reset ();
-                tx_in_ = tx_out_ = 0;
+                tx_in_ = 0;
+                tx_out_ = 0;
                 do_rs485_de (false);
               }
 
@@ -763,7 +768,8 @@ namespace os
           }
 
         // update the "in" pointer on buffer
-        if ((rx_in_ += xfered) >= rx_buff_size_)
+        rx_in_ = rx_in_ + xfered;
+        if (rx_in_ >= rx_buff_size_)
           {
             // if overflow, reset the "in" pointer, i.e. transfer was complete
             rx_in_ = 0;
@@ -809,7 +815,8 @@ namespace os
         is_error_ = true;
 
         huart_->RxState = HAL_UART_STATE_READY;
-        rx_in_ = rx_out_ = 0;
+        rx_in_ = 0;
+        rx_out_ = 0;
 
         rx_sem_.post ();
       }
