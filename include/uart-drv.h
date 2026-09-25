@@ -1,7 +1,7 @@
 /*
  * uart-drv.h
  *
- * Copyright (c) 2017-2021, 2024 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2017-2021, 2024, 2026 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -177,7 +177,7 @@ namespace os
 
         static constexpr uint8_t VERSION_MAJOR = 2;
         static constexpr uint8_t VERSION_MINOR = 2;
-        static constexpr uint8_t VERSION_PATCH = 2;
+        static constexpr uint8_t VERSION_PATCH = 3;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;
@@ -228,28 +228,29 @@ namespace os
         version_patch = VERSION_PATCH;
       }
 
-      inline void
-      uart_impl::invalidate_dcache (uint8_t* ptr, size_t len)
+       inline void
+      qspi_impl::invalidate_dcache (uint8_t* ptr, size_t len)
       {
         if (SCB->CCR & (uint32_t) SCB_CCR_DC_Msk)
           {
-            // D-cache is enabled
-            uint32_t* aligned_buff = (uint32_t*) (((uint32_t) ptr) & 0xFFFFFFE0);
-            uint32_t aligned_count = (uint32_t) (len & 0xFFFFFFE0) + 32;
-            SCB_CleanInvalidateDCache_by_Addr (aligned_buff, aligned_count);
+            // D-cache is enabled; round to cache line boundaries (32 bytes),
+            // accounting for ptr's own misalignment, not just len.
+            uint32_t start = ((uint32_t) ptr) & 0xFFFFFFE0;
+            uint32_t end = (((uint32_t) ptr) + len + 0x1F) & 0xFFFFFFE0;
+            SCB_CleanInvalidateDCache_by_Addr ((uint32_t*) start, end - start);
           }
       }
 
       inline void
-      uart_impl::clean_dcache (uint8_t* ptr, size_t len)
+      qspi_impl::clean_dcache (uint8_t* ptr, size_t len)
       {
         if (SCB->CCR & (uint32_t) SCB_CCR_DC_Msk)
           {
-            // D-cache is enabled
-            uint32_t* aligned_buff = (uint32_t*) (((uint32_t) (ptr))
-                & 0xFFFFFFE0);
-            uint32_t aligned_count = (uint32_t) (len & 0xFFFFFFE0) + 32;
-            SCB_CleanDCache_by_Addr (aligned_buff, aligned_count);
+            // D-cache is enabled; round to cache line boundaries (32 bytes),
+            // accounting for ptr's own misalignment, not just len.
+            uint32_t start = ((uint32_t) ptr) & 0xFFFFFFE0;
+            uint32_t end = (((uint32_t) ptr) + len + 0x1F) & 0xFFFFFFE0;
+            SCB_CleanDCache_by_Addr ((uint32_t*) start, end - start);
           }
       }
 
