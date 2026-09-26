@@ -229,7 +229,7 @@ namespace os
       }
 
        inline void
-      qspi_impl::invalidate_dcache (uint8_t* ptr, size_t len)
+      uart_impl::invalidate_dcache (uint8_t* ptr, size_t len)
       {
         if (SCB->CCR & (uint32_t) SCB_CCR_DC_Msk)
           {
@@ -242,7 +242,7 @@ namespace os
       }
 
       inline void
-      qspi_impl::clean_dcache (uint8_t* ptr, size_t len)
+      uart_impl::clean_dcache (uint8_t* ptr, size_t len)
       {
         if (SCB->CCR & (uint32_t) SCB_CCR_DC_Msk)
           {
