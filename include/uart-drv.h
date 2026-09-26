@@ -177,7 +177,7 @@ namespace os
 
         static constexpr uint8_t VERSION_MAJOR = 2;
         static constexpr uint8_t VERSION_MINOR = 2;
-        static constexpr uint8_t VERSION_PATCH = 3;
+        static constexpr uint8_t VERSION_PATCH = 4;
 
         UART_HandleTypeDef* huart_;
         uint8_t* tx_buff_;
